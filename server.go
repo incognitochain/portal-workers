@@ -20,7 +20,7 @@ func NewServer() *Server {
 	listWorkers := []workers.Worker{}
 	listWorkers = append(listWorkers, &workers.WorkerAbs{})
 
-	quitChan := make(chan os.Signal)
+	quitChan := make(chan os.Signal, 1)
 	signal.Notify(quitChan, syscall.SIGTERM)
 	signal.Notify(quitChan, syscall.SIGINT)
 	return &Server{
