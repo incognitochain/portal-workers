@@ -143,14 +143,14 @@ func (b *BTCBroadcastingManager) Execute() {
 		}
 
 		var wg sync.WaitGroup
-		broadcastTxsChan := make(chan *BroadcastTxsBlock, IncBlockBatchSize)
+		broadcastTxsBlockChan := make(chan *BroadcastTxsBlock, IncBlockBatchSize)
 		for idx := nextBlkHeight; idx < nextBlkHeight+IncBlockBatchSize; idx++ {
 			curIdx := idx
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 				txContentArray, txHashArray, err := b.getBroadcastTxsFromBeaconHeight(curIdx)
-				broadcastTxsChan <- &BroadcastTxsBlock{
+				broadcastTxsBlockChan <- &BroadcastTxsBlock{
 					TxRawContent: txContentArray,
 					TxHashes:     txHashArray,
 					BlkHeight:    curIdx,
@@ -163,19 +163,19 @@ func (b *BTCBroadcastingManager) Execute() {
 		tempBroadcastTx := []*BroadcastTx{}
 		tempTxContentArray := []string{}
 		for idx := nextBlkHeight; idx < nextBlkHeight+IncBlockBatchSize; idx++ {
-			broadcastTxsRes := <-broadcastTxsChan
-			if broadcastTxsRes.Err != nil {
-				if broadcastTxsRes.BlkHeight <= curIncBlkHeight {
-					msg := fmt.Sprintf("Could not retrieve Incognito block - with err: %v", broadcastTxsRes.Err)
+			broadcastTxsBlockItem := <-broadcastTxsBlockChan
+			if broadcastTxsBlockItem.Err != nil {
+				if broadcastTxsBlockItem.BlkHeight <= curIncBlkHeight {
+					msg := fmt.Sprintf("Could not retrieve Incognito block - with err: %v", broadcastTxsBlockItem.Err)
 					b.Logger.Error(msg)
 					utils.SendSlackNotification(msg)
 				}
 				return
 			}
-			for i := 0; i < len(broadcastTxsRes.TxHashes); i++ {
-				txHash := broadcastTxsRes.TxHashes[i]
-				txContent := broadcastTxsRes.TxRawContent[i]
-				tempBroadcastTx = append(tempBroadcastTx, &BroadcastTx{TxHash: txHash, BlkHeight: broadcastTxsRes.BlkHeight})
+			for i := 0; i < len(broadcastTxsBlockItem.TxHashes); i++ {
+				txHash := broadcastTxsBlockItem.TxHashes[i]
+				txContent := broadcastTxsBlockItem.TxRawContent[i]
+				tempBroadcastTx = append(tempBroadcastTx, &BroadcastTx{TxHash: txHash, BlkHeight: broadcastTxsBlockItem.BlkHeight})
 				tempTxContentArray = append(tempTxContentArray, txContent)
 			}
 		}
