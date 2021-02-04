@@ -62,7 +62,6 @@ func (b *BTCBroadcastingManager) Init(id int, name string, freq int, network str
 		utils.SendSlackNotification(msg)
 		return err
 	}
-	defer b.db.Close()
 
 	return nil
 }
@@ -115,6 +114,7 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(height uint64) 
 
 func (b *BTCBroadcastingManager) Execute() {
 	b.Logger.Info("BTCBroadcastingManager agent is executing...")
+	defer b.db.Close()
 
 	nextBlkHeight := uint64(FirstBroadcastTxBlockHeight)
 	broadcastTxArray := []*BroadcastTx{}
@@ -126,12 +126,8 @@ func (b *BTCBroadcastingManager) Execute() {
 		json.Unmarshal(lastUpdateBytes, &broadcastTxsDBObject)
 		nextBlkHeight = broadcastTxsDBObject.NextBlkHeight
 		broadcastTxArray = broadcastTxsDBObject.TxArray
-	} else {
-		msg := fmt.Sprintf("Could not get broadcasted tx from db - with err: %v", err)
-		b.Logger.Error(msg)
-		utils.SendSlackNotification(msg)
-		return
 	}
+
 	for {
 		curIncBlkHeight, err := b.getLatestBeaconHeight()
 		if err != nil {
@@ -153,6 +149,8 @@ func (b *BTCBroadcastingManager) Execute() {
 		} else {
 			IncBlockBatchSize = 1
 		}
+
+		fmt.Printf("Next Scan Block Height: %v, Batch Size: %v, Current Block Height: %v\n", nextBlkHeight, IncBlockBatchSize, curIncBlkHeight)
 
 		var wg sync.WaitGroup
 		broadcastTxsBlockChan := make(chan *BroadcastTxsBlock, IncBlockBatchSize)
