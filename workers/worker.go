@@ -20,7 +20,7 @@ type WorkerAbs struct {
 }
 
 type Worker interface {
-	Init(id int, name string, freq int, network string)
+	Init(id int, name string, freq int, network string) error
 	Execute()
 	GetName() string
 	GetFrequency() int
@@ -28,7 +28,7 @@ type Worker interface {
 	GetNetwork() string
 }
 
-func (a *WorkerAbs) Init(id int, name string, freq int, network string) {
+func (a *WorkerAbs) Init(id int, name string, freq int, network string) error {
 	a.ID = id
 	a.Name = name
 	a.Frequency = freq
@@ -40,6 +40,7 @@ func (a *WorkerAbs) Init(id int, name string, freq int, network string) {
 		panic(fmt.Sprintf("Could instantiate a logger for worker: %v\n", a.Name))
 	}
 	a.Logger = logger
+	return err
 }
 
 func (a *WorkerAbs) Execute() {

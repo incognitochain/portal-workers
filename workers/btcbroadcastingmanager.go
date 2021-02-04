@@ -20,11 +20,34 @@ const TimeoutBTCFeeReplacement = 100
 
 type BTCBroadcastingManager struct {
 	WorkerAbs
-	RPCUnconfirmedBroadcastTxsReader *utils.HttpClient
+	bcy      gobcy.API
+	bcyChain gobcy.Blockchain
+	db       *leveldb.DB
 }
 
-func (b *BTCBroadcastingManager) Init(id int, name string, freq int, network string) {
-	b.WorkerAbs.Init(id, name, freq, network)
+func (b *BTCBroadcastingManager) Init(id int, name string, freq int, network string) error {
+	err := b.WorkerAbs.Init(id, name, freq, network)
+	// init blockcypher instance
+	b.bcy = gobcy.API{Token: os.Getenv("BLOCKCYPHER_TOKEN"), Coin: "btc", Chain: b.GetNetwork()}
+	b.bcyChain, err = b.bcy.GetChain()
+	if err != nil {
+		msg := fmt.Sprintf("Could not get btc chain info from cypher api - with err: %v", err)
+		b.Logger.Error(msg)
+		utils.SendSlackNotification(msg)
+		return err
+	}
+
+	// init leveldb instance
+	b.db, err = leveldb.OpenFile("db", nil)
+	if err != nil {
+		msg := fmt.Sprintf("Could not open leveldb storage file - with err: %v", err)
+		b.Logger.Error(msg)
+		utils.SendSlackNotification(msg)
+		return err
+	}
+	defer b.db.Close()
+
+	return nil
 }
 
 type BroadcastTxsBlock struct {
@@ -39,16 +62,16 @@ type BroadcastTx struct {
 }
 
 type BroadcastTxArrayObject struct {
-	TxArray   []*BroadcastTx
-	BlkHeight uint64 // height of the last updated Inc beacon block
+	TxArray       []*BroadcastTx
+	NextBlkHeight uint64 // height of the next block need to scan in Inc chain
 }
 
-func isTimeoutBTCTx(broadcastBlockHeight uint64, curBlockHeight uint64) bool {
+func (b *BTCBroadcastingManager) isTimeoutBTCTx(broadcastBlockHeight uint64, curBlockHeight uint64) bool {
 	return curBlockHeight-broadcastBlockHeight <= TimeoutBTCFeeReplacement
 }
 
 // todo: check if confirmed
-func isConfirmedBTCTx(txHash string, chain gobcy.Blockchain) bool {
+func (b *BTCBroadcastingManager) isConfirmedBTCTx(txHash string) bool {
 	return false
 }
 
@@ -72,45 +95,29 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(height uint64) 
 	return []string{}, []string{}, nil
 }
 
-// todo: broadcast to BTC chain
 func (b *BTCBroadcastingManager) broadcastTx(txContent string) error {
+	skel, err := b.bcy.PushTX(txContent)
+	if err != nil {
+		msg := fmt.Sprintf("Could not broadcast tx to BTC chain - with err: %v \n Decoded tx: %v", err, skel)
+		b.Logger.Error(msg)
+		utils.SendSlackNotification(msg)
+		return err
+	}
 	return nil
 }
 
 func (b *BTCBroadcastingManager) Execute() {
 	b.Logger.Info("BTCBroadcastingManager agent is executing...")
 
-	// init blockcypher instance
-	bc := gobcy.API{Token: os.Getenv("BLOCKCYPHER_TOKEN"), Coin: "btc", Chain: b.GetNetwork()}
-	btcCypherChain, err := bc.GetChain()
-	if err != nil {
-		msg := fmt.Sprintf("Could not get btc chain info from cypher api - with err: %v", err)
-		b.Logger.Error(msg)
-		utils.SendSlackNotification(msg)
-		return
-	}
-	alertMsg := fmt.Sprintf("The latest block info from Cypher: height (%d), hash (%s)", btcCypherChain.Height, btcCypherChain.Hash)
-	utils.SendSlackNotification(alertMsg)
-
-	// init leveldb instance
-	db, err := leveldb.OpenFile("db", nil)
-	if err != nil {
-		msg := fmt.Sprintf("Could not open leveldb storage file - with err: %v", err)
-		b.Logger.Error(msg)
-		utils.SendSlackNotification(msg)
-		return
-	}
-	defer db.Close()
-
-	lastUpdatedIncBlockHeight := uint64(FirstBroadcastTxBlockHeight) - 1
+	nextBlkHeight := uint64(FirstBroadcastTxBlockHeight)
 	broadcastTxArray := []*BroadcastTx{}
 
 	// restore from db
-	lastUpdateBytes, err := db.Get([]byte("BTCBroadcast-LastUpdate"), nil)
+	lastUpdateBytes, err := b.db.Get([]byte("BTCBroadcast-LastUpdate"), nil)
 	if err == nil {
 		var broadcastTxsDBObject *BroadcastTxArrayObject
 		json.Unmarshal(lastUpdateBytes, &broadcastTxsDBObject)
-		lastUpdatedIncBlockHeight = broadcastTxsDBObject.BlkHeight
+		nextBlkHeight = broadcastTxsDBObject.NextBlkHeight
 		broadcastTxArray = broadcastTxsDBObject.TxArray
 	} else {
 		msg := fmt.Sprintf("Could not get broadcasted tx from db - with err: %v", err)
@@ -118,8 +125,6 @@ func (b *BTCBroadcastingManager) Execute() {
 		utils.SendSlackNotification(msg)
 		return
 	}
-
-	nextBlkHeight := lastUpdatedIncBlockHeight + 1
 	for {
 		curIncBlkHeight, err := b.getLatestBeaconHeight()
 		if err != nil {
@@ -193,7 +198,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		idx := 0
 		lenArray := len(broadcastTxArray)
 		for idx < lenArray {
-			if isConfirmedBTCTx(broadcastTxArray[idx].TxHash, btcCypherChain) {
+			if b.isConfirmedBTCTx(broadcastTxArray[idx].TxHash) {
 				// todo: send rpc to notify the Inc chain
 				broadcastTxArray[lenArray-1], broadcastTxArray[idx] = broadcastTxArray[idx], broadcastTxArray[lenArray-1]
 				lenArray--
@@ -207,7 +212,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		idx = 0
 		lenArray = 0
 		for idx < lenArray {
-			if isTimeoutBTCTx(broadcastTxArray[idx].BlkHeight, curIncBlkHeight) { // waiting too long
+			if b.isTimeoutBTCTx(broadcastTxArray[idx].BlkHeight, curIncBlkHeight) { // waiting too long
 				// todo: send rpc to notify the Inc chain for fee replacement
 				broadcastTxArray[lenArray-1], broadcastTxArray[idx] = broadcastTxArray[idx], broadcastTxArray[lenArray-1]
 				lenArray--
@@ -220,10 +225,10 @@ func (b *BTCBroadcastingManager) Execute() {
 
 		// update to db
 		BroadcastTxArrayObjectBytes, _ := json.Marshal(&BroadcastTxArrayObject{
-			TxArray:   broadcastTxArray,
-			BlkHeight: nextBlkHeight - 1,
+			TxArray:       broadcastTxArray,
+			NextBlkHeight: nextBlkHeight,
 		})
-		err = db.Put([]byte("BTCBroadcast-LastUpdate"), BroadcastTxArrayObjectBytes, nil)
+		err = b.db.Put([]byte("BTCBroadcast-LastUpdate"), BroadcastTxArrayObjectBytes, nil)
 		if err != nil {
 			msg := fmt.Sprintf("Could not save object to db - with err: %v", err)
 			b.Logger.Error(msg)
