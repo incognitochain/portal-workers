@@ -30,7 +30,10 @@ func GetNewFee(txSize int, oldFee uint64) (uint64, error) {
 
 	newFee := responseBody.HalfHourFee * uint64(txSize)
 	if newFee < oldFee {
-		newFee = oldFee
+		newFee = responseBody.FastestFee * uint64(txSize)
+	}
+	if newFee < oldFee {
+		newFee = uint64(float64(oldFee) * 1.1)
 	}
 	return newFee, nil
 }
