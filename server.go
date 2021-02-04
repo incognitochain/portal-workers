@@ -20,7 +20,10 @@ func NewServer() *Server {
 	listWorkers := []workers.Worker{}
 
 	btcWorker := &workers.BTCBroadcastingManager{}
-	btcWorker.Init(1, "BTC Broadcasting Manager", 60, os.Getenv("BTC_NETWORK"))
+	err := btcWorker.Init(1, "BTC Broadcasting Manager", 60, os.Getenv("BTC_NETWORK"))
+	if err != nil {
+		panic("Can't init BTC Broadcasting Manager")
+	}
 
 	listWorkers = append(listWorkers, btcWorker)
 
