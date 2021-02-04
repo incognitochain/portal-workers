@@ -17,12 +17,29 @@ import (
 const InitIncBlockBatchSize = 1000
 const FirstBroadcastTxBlockHeight = 1
 const TimeoutBTCFeeReplacement = 100
+const ConfirmationThreshold = 6
 
 type BTCBroadcastingManager struct {
 	WorkerAbs
 	bcy      gobcy.API
 	bcyChain gobcy.Blockchain
 	db       *leveldb.DB
+}
+
+type BroadcastTxsBlock struct {
+	TxRawContent []string
+	TxHashes     []string
+	BlkHeight    uint64
+	Err          error
+}
+type BroadcastTx struct {
+	TxHash    string
+	BlkHeight uint64 // height of the broadcast tx
+}
+
+type BroadcastTxArrayObject struct {
+	TxArray       []*BroadcastTx
+	NextBlkHeight uint64 // height of the next block need to scan in Inc chain
 }
 
 func (b *BTCBroadcastingManager) Init(id int, name string, freq int, network string) error {
@@ -50,29 +67,30 @@ func (b *BTCBroadcastingManager) Init(id int, name string, freq int, network str
 	return nil
 }
 
-type BroadcastTxsBlock struct {
-	TxRawContent []string
-	TxHashes     []string
-	BlkHeight    uint64
-	Err          error
-}
-type BroadcastTx struct {
-	TxHash    string
-	BlkHeight uint64 // height of the broadcast tx
-}
-
-type BroadcastTxArrayObject struct {
-	TxArray       []*BroadcastTx
-	NextBlkHeight uint64 // height of the next block need to scan in Inc chain
-}
-
 func (b *BTCBroadcastingManager) isTimeoutBTCTx(broadcastBlockHeight uint64, curBlockHeight uint64) bool {
 	return curBlockHeight-broadcastBlockHeight <= TimeoutBTCFeeReplacement
 }
 
-// todo: check if confirmed
 func (b *BTCBroadcastingManager) isConfirmedBTCTx(txHash string) bool {
-	return false
+	tx, err := b.bcy.GetTX(txHash, nil)
+	if err != nil {
+		msg := fmt.Sprintf("Could not check the confirmation of tx in BTC chain - with err: %v \n Tx hash: %v", err, txHash)
+		b.Logger.Error(msg)
+		utils.SendSlackNotification(msg)
+		return false
+	}
+	return tx.Confirmations >= ConfirmationThreshold
+}
+
+func (b *BTCBroadcastingManager) broadcastTx(txContent string) error {
+	skel, err := b.bcy.PushTX(txContent)
+	if err != nil {
+		msg := fmt.Sprintf("Could not broadcast tx to BTC chain - with err: %v \n Decoded tx: %v", err, skel)
+		b.Logger.Error(msg)
+		utils.SendSlackNotification(msg)
+		return err
+	}
+	return nil
 }
 
 func (b *BTCBroadcastingManager) getLatestBeaconHeight() (uint64, error) {
@@ -93,17 +111,6 @@ func (b *BTCBroadcastingManager) getLatestBeaconHeight() (uint64, error) {
 // todo: return a list of tx raw content, tx hash and error
 func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(height uint64) ([]string, []string, error) {
 	return []string{}, []string{}, nil
-}
-
-func (b *BTCBroadcastingManager) broadcastTx(txContent string) error {
-	skel, err := b.bcy.PushTX(txContent)
-	if err != nil {
-		msg := fmt.Sprintf("Could not broadcast tx to BTC chain - with err: %v \n Decoded tx: %v", err, skel)
-		b.Logger.Error(msg)
-		utils.SendSlackNotification(msg)
-		return err
-	}
-	return nil
 }
 
 func (b *BTCBroadcastingManager) Execute() {
