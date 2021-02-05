@@ -124,8 +124,25 @@ func (b *BTCBroadcastingManager) getLatestBTCBlockHashFromIncog() (uint64, error
 	return uint64(currentBTCBlkHeight), nil
 }
 
-// todo: return a list of tx raw content, tx hash and error
 func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(height uint64) ([]string, []string, error) {
+	params := []interface{}{
+		height,
+	}
+	var beaconblockRes entities.BeaconBlockByHeightRes
+	err := b.RPCClient.RPCCall("retrievebeaconblockbyheight", params, &beaconblockRes)
+	if err != nil {
+		return []string{}, []string{}, err
+	}
+	if beaconblockRes.RPCError != nil {
+		b.Logger.Errorf("getBroadcastTxsFromBeaconHeight: call RPC error, %v\n", beaconblockRes.RPCError.StackTrace)
+		return []string{}, []string{}, errors.New(beaconblockRes.RPCError.Message)
+	}
+
+	// todo: get tx raw content, tx hash
+	for _, instruction := range beaconblockRes.Result[0].Instructions {
+		fmt.Println(instruction)
+	}
+
 	return []string{}, []string{}, nil
 }
 
