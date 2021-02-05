@@ -22,6 +22,7 @@ type WorkerAbs struct {
 type Worker interface {
 	Init(id int, name string, freq int, network string) error
 	Execute()
+	ExportErrorLog(msg string)
 	GetName() string
 	GetFrequency() int
 	GetQuitChan() chan bool
@@ -45,6 +46,11 @@ func (a *WorkerAbs) Init(id int, name string, freq int, network string) error {
 
 func (a *WorkerAbs) Execute() {
 	fmt.Println("Abstract worker is executing...")
+}
+
+func (a *WorkerAbs) ExportErrorLog(msg string) {
+	a.Logger.Error(msg)
+	utils.SendSlackNotification(msg)
 }
 
 func (a *WorkerAbs) GetName() string {
