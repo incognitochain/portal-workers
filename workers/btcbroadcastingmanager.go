@@ -10,7 +10,6 @@ import (
 
 	"github.com/blockcypher/gobcy"
 	"github.com/incognitochain/portal-workers/entities"
-	"github.com/incognitochain/portal-workers/utils"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -48,45 +47,42 @@ func (b *BTCBroadcastingManager) Init(id int, name string, freq int, network str
 	b.bcy = gobcy.API{Token: os.Getenv("BLOCKCYPHER_TOKEN"), Coin: "btc", Chain: b.GetNetwork()}
 	b.bcyChain, err = b.bcy.GetChain()
 	if err != nil {
-		msg := fmt.Sprintf("Could not get btc chain info from cypher api - with err: %v", err)
-		b.Logger.Error(msg)
-		utils.SendSlackNotification(msg)
+		b.ExportErrorLog(fmt.Sprintf("Could not get btc chain info from cypher api - with err: %v", err))
 		return err
 	}
 
 	// init leveldb instance
 	b.db, err = leveldb.OpenFile("db", nil)
 	if err != nil {
-		msg := fmt.Sprintf("Could not open leveldb storage file - with err: %v", err)
-		b.Logger.Error(msg)
-		utils.SendSlackNotification(msg)
+		b.ExportErrorLog(fmt.Sprintf("Could not open leveldb storage file - with err: %v", err))
 		return err
 	}
 
 	return nil
 }
 
+func (b *BTCBroadcastingManager) ExportErrorLog(msg string) {
+	b.WorkerAbs.ExportErrorLog(msg)
+}
+
 func (b *BTCBroadcastingManager) isTimeoutBTCTx(broadcastBlockHeight uint64, curBlockHeight uint64) bool {
 	return curBlockHeight-broadcastBlockHeight <= TimeoutBTCFeeReplacement
 }
 
-func (b *BTCBroadcastingManager) isConfirmedBTCTx(txHash string) bool {
+// return boolean value of transaction confirmation and bitcoin block height
+func (b *BTCBroadcastingManager) isConfirmedBTCTx(txHash string) (bool, uint64) {
 	tx, err := b.bcy.GetTX(txHash, nil)
 	if err != nil {
-		msg := fmt.Sprintf("Could not check the confirmation of tx in BTC chain - with err: %v \n Tx hash: %v", err, txHash)
-		b.Logger.Error(msg)
-		utils.SendSlackNotification(msg)
-		return false
+		b.ExportErrorLog(fmt.Sprintf("Could not check the confirmation of tx in BTC chain - with err: %v \n Tx hash: %v", err, txHash))
+		return false, 0
 	}
-	return tx.Confirmations >= ConfirmationThreshold
+	return tx.Confirmations >= ConfirmationThreshold, uint64(tx.BlockHeight)
 }
 
 func (b *BTCBroadcastingManager) broadcastTx(txContent string) error {
 	skel, err := b.bcy.PushTX(txContent)
 	if err != nil {
-		msg := fmt.Sprintf("Could not broadcast tx to BTC chain - with err: %v \n Decoded tx: %v", err, skel)
-		b.Logger.Error(msg)
-		utils.SendSlackNotification(msg)
+		b.ExportErrorLog(fmt.Sprintf("Could not broadcast tx to BTC chain - with err: %v \n Decoded tx: %v", err, skel))
 		return err
 	}
 	return nil
@@ -105,6 +101,27 @@ func (b *BTCBroadcastingManager) getLatestBeaconHeight() (uint64, error) {
 		return 0, errors.New(beaconBestStateRes.RPCError.Message)
 	}
 	return beaconBestStateRes.Result.BeaconHeight, nil
+}
+
+func (b *BTCBroadcastingManager) getLatestBTCBlockHashFromIncog() (uint64, error) {
+	params := []interface{}{}
+	var btcRelayingBestStateRes entities.BTCRelayingBestStateRes
+	err := b.RPCClient.RPCCall("getbtcrelayingbeststate", params, &btcRelayingBestStateRes)
+	if err != nil {
+		return 0, err
+	}
+	if btcRelayingBestStateRes.RPCError != nil {
+		b.Logger.Errorf("getLatestBTCBlockHashFromIncog: call RPC error, %v\n", btcRelayingBestStateRes.RPCError.StackTrace)
+		return 0, errors.New(btcRelayingBestStateRes.RPCError.Message)
+	}
+
+	// check whether there was a fork happened or not
+	btcBestState := btcRelayingBestStateRes.Result
+	if btcBestState == nil {
+		return 0, errors.New("BTC relaying best state is nil")
+	}
+	currentBTCBlkHeight := btcBestState.Height
+	return uint64(currentBTCBlkHeight), nil
 }
 
 // todo: return a list of tx raw content, tx hash and error
@@ -139,6 +156,7 @@ func (b *BTCBroadcastingManager) Execute() {
 			time.Sleep(10 * time.Second)
 			curIncBlkHeight, err = b.getLatestBeaconHeight()
 			if err != nil {
+				b.ExportErrorLog(fmt.Sprintf("Could not get latest beacon height - with err: %v", err))
 				return
 			}
 		}
@@ -176,9 +194,7 @@ func (b *BTCBroadcastingManager) Execute() {
 			broadcastTxsBlockItem := <-broadcastTxsBlockChan
 			if broadcastTxsBlockItem.Err != nil {
 				if broadcastTxsBlockItem.BlkHeight <= curIncBlkHeight {
-					msg := fmt.Sprintf("Could not retrieve Incognito block - with err: %v", broadcastTxsBlockItem.Err)
-					b.Logger.Error(msg)
-					utils.SendSlackNotification(msg)
+					b.ExportErrorLog(fmt.Sprintf("Could not retrieve Incognito block - with err: %v", broadcastTxsBlockItem.Err))
 				}
 				return
 			}
@@ -200,10 +216,16 @@ func (b *BTCBroadcastingManager) Execute() {
 		}
 
 		// check confirmed -> send rpc to notify the Inc chain
+		relayingBTCHeight, err := b.getLatestBTCBlockHashFromIncog()
+		if err != nil {
+			b.ExportErrorLog(fmt.Sprintf("Could not retrieve Inc relaying BTC block height - with err: %v", err))
+			return
+		}
 		idx := 0
 		lenArray := len(broadcastTxArray)
 		for idx < lenArray {
-			if b.isConfirmedBTCTx(broadcastTxArray[idx].TxHash) {
+			isConfirmed, btcBlockHeight := b.isConfirmedBTCTx(broadcastTxArray[idx].TxHash)
+			if isConfirmed && btcBlockHeight <= relayingBTCHeight {
 				// todo: send rpc to notify the Inc chain
 				broadcastTxArray[lenArray-1], broadcastTxArray[idx] = broadcastTxArray[idx], broadcastTxArray[lenArray-1]
 				lenArray--
@@ -235,9 +257,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		})
 		err = b.db.Put([]byte("BTCBroadcast-LastUpdate"), BroadcastTxArrayObjectBytes, nil)
 		if err != nil {
-			msg := fmt.Sprintf("Could not save object to db - with err: %v", err)
-			b.Logger.Error(msg)
-			utils.SendSlackNotification(msg)
+			b.ExportErrorLog(fmt.Sprintf("Could not save object to db - with err: %v", err))
 			return
 		}
 
