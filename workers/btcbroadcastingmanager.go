@@ -25,15 +25,17 @@ type BTCBroadcastingManager struct {
 	db       *leveldb.DB
 }
 
-type BroadcastTxsBlock struct {
-	TxRawContent []string
-	TxHashes     []string
-	BlkHeight    uint64
-	Err          error
-}
 type BroadcastTx struct {
+	TxContent string
 	TxHash    string
+	BatchID   int
 	BlkHeight uint64 // height of the broadcast tx
+}
+
+type BroadcastTxsBlock struct {
+	TxArray   []*BroadcastTx
+	BlkHeight uint64
+	Err       error
 }
 
 type BroadcastTxArrayObject struct {
@@ -124,26 +126,38 @@ func (b *BTCBroadcastingManager) getLatestBTCBlockHashFromIncog() (uint64, error
 	return uint64(currentBTCBlkHeight), nil
 }
 
-func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(height uint64) ([]string, []string, error) {
+func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(height uint64) *BroadcastTxsBlock {
 	params := []interface{}{
 		height,
 	}
 	var beaconblockRes entities.BeaconBlockByHeightRes
 	err := b.RPCClient.RPCCall("retrievebeaconblockbyheight", params, &beaconblockRes)
 	if err != nil {
-		return []string{}, []string{}, err
+		return &BroadcastTxsBlock{
+			TxArray:   []*BroadcastTx{},
+			BlkHeight: height,
+			Err:       err,
+		}
 	}
 	if beaconblockRes.RPCError != nil {
 		b.Logger.Errorf("getBroadcastTxsFromBeaconHeight: call RPC error, %v\n", beaconblockRes.RPCError.StackTrace)
-		return []string{}, []string{}, errors.New(beaconblockRes.RPCError.Message)
+		return &BroadcastTxsBlock{
+			TxArray:   []*BroadcastTx{},
+			BlkHeight: height,
+			Err:       errors.New(beaconblockRes.RPCError.Message),
+		}
 	}
 
-	// todo: get tx raw content, tx hash
+	// todo: get tx raw content, hash, batchID
 	for _, instruction := range beaconblockRes.Result[0].Instructions {
 		fmt.Println(instruction)
 	}
 
-	return []string{}, []string{}, nil
+	return &BroadcastTxsBlock{
+		TxArray:   []*BroadcastTx{},
+		BlkHeight: height,
+		Err:       nil,
+	}
 }
 
 func (b *BTCBroadcastingManager) Execute() {
@@ -194,19 +208,12 @@ func (b *BTCBroadcastingManager) Execute() {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				txContentArray, txHashArray, err := b.getBroadcastTxsFromBeaconHeight(curIdx)
-				broadcastTxsBlockChan <- &BroadcastTxsBlock{
-					TxRawContent: txContentArray,
-					TxHashes:     txHashArray,
-					BlkHeight:    curIdx,
-					Err:          err,
-				}
+				broadcastTxsBlockChan <- b.getBroadcastTxsFromBeaconHeight(curIdx)
 			}()
 		}
 		wg.Wait()
 
 		tempBroadcastTx := []*BroadcastTx{}
-		tempTxContentArray := []string{}
 		for idx := nextBlkHeight; idx < nextBlkHeight+IncBlockBatchSize; idx++ {
 			broadcastTxsBlockItem := <-broadcastTxsBlockChan
 			if broadcastTxsBlockItem.Err != nil {
@@ -215,18 +222,13 @@ func (b *BTCBroadcastingManager) Execute() {
 				}
 				return
 			}
-			for i := 0; i < len(broadcastTxsBlockItem.TxHashes); i++ {
-				txHash := broadcastTxsBlockItem.TxHashes[i]
-				txContent := broadcastTxsBlockItem.TxRawContent[i]
-				tempBroadcastTx = append(tempBroadcastTx, &BroadcastTx{TxHash: txHash, BlkHeight: broadcastTxsBlockItem.BlkHeight})
-				tempTxContentArray = append(tempTxContentArray, txContent)
-			}
+			tempBroadcastTx = append(tempBroadcastTx, broadcastTxsBlockItem.TxArray...)
 		}
 
 		// if there is no error
 		broadcastTxArray = append(broadcastTxArray, tempBroadcastTx...)
-		for _, txContent := range tempTxContentArray {
-			err := b.broadcastTx(txContent)
+		for _, tx := range tempBroadcastTx {
+			err := b.broadcastTx(tx.TxContent)
 			if err != nil {
 				return
 			}
@@ -242,6 +244,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		lenArray := len(broadcastTxArray)
 		for idx < lenArray {
 			isConfirmed, btcBlockHeight := b.isConfirmedBTCTx(broadcastTxArray[idx].TxHash)
+			// todo: generate BTC proof
 			if isConfirmed && btcBlockHeight <= relayingBTCHeight {
 				// todo: send rpc to notify the Inc chain
 				broadcastTxArray[lenArray-1], broadcastTxArray[idx] = broadcastTxArray[idx], broadcastTxArray[lenArray-1]
