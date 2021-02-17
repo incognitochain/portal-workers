@@ -5,7 +5,10 @@ go 1.13
 require (
 	github.com/blockcypher/gobcy v2.0.1+incompatible
 	github.com/btcsuite/btcd v0.21.0-beta
+	github.com/btcsuite/btcutil v1.0.2
+	github.com/incognitochain/incognito-chain v0.0.0-20210121082946-4a4818b0daca
 	github.com/joho/godotenv v1.3.0
 	github.com/sirupsen/logrus v1.7.0
 	github.com/syndtr/goleveldb v1.0.0
+	golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37
 )

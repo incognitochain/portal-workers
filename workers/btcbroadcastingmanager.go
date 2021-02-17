@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,7 +10,9 @@ import (
 	"time"
 
 	"github.com/blockcypher/gobcy"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/incognitochain/portal-workers/entities"
+	"github.com/incognitochain/portal-workers/utils"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -160,6 +163,42 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(height uint64) 
 	}
 }
 
+func (b *BTCBroadcastingManager) buildProof(txID string, blkHeight uint64) (string, error) {
+	cypherBlock, err := b.bcy.GetBlock(
+		int(blkHeight),
+		"",
+		map[string]string{
+			"txstart": "0",
+			"limit":   "500",
+		},
+	)
+
+	if err != nil {
+		return "", err
+	}
+
+	txIDs := cypherBlock.TXids
+	txHashes := make([]*chainhash.Hash, len(txIDs))
+	for i := 0; i < len(txIDs); i++ {
+		txHashes[i], _ = chainhash.NewHashFromStr(txIDs[i])
+	}
+
+	msgTx := utils.BuildMsgTxFromCypher(txID, b.GetNetwork())
+	txHash := msgTx.TxHash()
+	blkHash, _ := chainhash.NewHashFromStr(cypherBlock.Hash)
+
+	merkleProofs := utils.BuildMerkleProof(txHashes, &txHash)
+	btcProof := utils.BTCProof{
+		MerkleProofs: merkleProofs,
+		BTCTx:        msgTx,
+		BlockHash:    blkHash,
+	}
+	btcProofBytes, _ := json.Marshal(btcProof)
+	btcProofStr := base64.StdEncoding.EncodeToString(btcProofBytes)
+
+	return btcProofStr, nil
+}
+
 func (b *BTCBroadcastingManager) Execute() {
 	b.Logger.Info("BTCBroadcastingManager agent is executing...")
 	defer b.db.Close()
@@ -243,9 +282,18 @@ func (b *BTCBroadcastingManager) Execute() {
 		idx := 0
 		lenArray := len(broadcastTxArray)
 		for idx < lenArray {
-			isConfirmed, btcBlockHeight := b.isConfirmedBTCTx(broadcastTxArray[idx].TxHash)
-			// todo: generate BTC proof
+			txHash := broadcastTxArray[idx].TxHash
+			isConfirmed, btcBlockHeight := b.isConfirmedBTCTx(txHash)
+
 			if isConfirmed && btcBlockHeight <= relayingBTCHeight {
+				// generate BTC proof
+				btcProof, err := b.buildProof(txHash, btcBlockHeight)
+				fmt.Printf("%+v\n", btcProof)
+				if err != nil {
+					b.ExportErrorLog(fmt.Sprintf("Could not generate BTC proof - with err: %v", err))
+					return
+				}
+
 				// todo: send rpc to notify the Inc chain
 				broadcastTxArray[lenArray-1], broadcastTxArray[idx] = broadcastTxArray[idx], broadcastTxArray[lenArray-1]
 				lenArray--
