@@ -9,8 +9,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0xkraken/incognito-sdk-golang/wallet"
 	"github.com/blockcypher/gobcy"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/incognitochain/incognito-chain/portalv4/metadata"
 	"github.com/incognitochain/portal-workers/entities"
 	"github.com/incognitochain/portal-workers/utils"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -31,7 +33,7 @@ type BTCBroadcastingManager struct {
 type BroadcastTx struct {
 	TxContent string
 	TxHash    string
-	BatchID   int
+	BatchID   string
 	BlkHeight uint64 // height of the broadcast tx
 }
 
@@ -199,6 +201,25 @@ func (b *BTCBroadcastingManager) buildProof(txID string, blkHeight uint64) (stri
 	return btcProofStr, nil
 }
 
+func (b *BTCBroadcastingManager) submitConfirmedTx(proof string, batchID string) (string, error) {
+	rpcClient, keyWallet, err := initSetParams(b.RPCClient)
+	if err != nil {
+		return "", err
+	}
+	meta, _ := metadata.NewPortalSubmitConfirmedTxRequest(PortalSubmitConfirmedTxMeta, proof, BTCID, batchID)
+	return sendTx(rpcClient, keyWallet, meta)
+}
+
+func (b *BTCBroadcastingManager) requestFeeReplacement(batchID string, newFee uint) (string, error) {
+	rpcClient, keyWallet, err := initSetParams(b.RPCClient)
+	if err != nil {
+		return "", err
+	}
+	paymentAddrStr := keyWallet.Base58CheckSerialize(wallet.PaymentAddressType)
+	meta, _ := metadata.NewPortalReplacementFeeRequest(PortalReplacementFeeRequestMeta, paymentAddrStr, BTCID, batchID, newFee)
+	return sendTx(rpcClient, keyWallet, meta)
+}
+
 func (b *BTCBroadcastingManager) Execute() {
 	b.Logger.Info("BTCBroadcastingManager agent is executing...")
 	defer b.db.Close()
@@ -294,7 +315,12 @@ func (b *BTCBroadcastingManager) Execute() {
 					return
 				}
 
-				// todo: send rpc to notify the Inc chain
+				// submit confirmed tx
+				_, err = b.submitConfirmedTx(btcProof, broadcastTxArray[idx].BatchID)
+				if err != nil {
+					b.ExportErrorLog(fmt.Sprintf("Could not submit confirmed tx - with err: %v", err))
+					return
+				}
 				broadcastTxArray[lenArray-1], broadcastTxArray[idx] = broadcastTxArray[idx], broadcastTxArray[lenArray-1]
 				lenArray--
 			} else {
@@ -308,7 +334,10 @@ func (b *BTCBroadcastingManager) Execute() {
 		lenArray = 0
 		for idx < lenArray {
 			if b.isTimeoutBTCTx(broadcastTxArray[idx].BlkHeight, curIncBlkHeight) { // waiting too long
-				// todo: send rpc to notify the Inc chain for fee replacement
+				// todo: get new fee (per request?)
+				newFee := uint(0)
+				// notify the Inc chain for fee replacement
+				_, err = b.requestFeeReplacement(broadcastTxArray[idx].BatchID, newFee)
 				broadcastTxArray[lenArray-1], broadcastTxArray[idx] = broadcastTxArray[idx], broadcastTxArray[lenArray-1]
 				lenArray--
 			} else {
