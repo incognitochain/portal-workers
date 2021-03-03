@@ -37,6 +37,7 @@ type BroadcastTx struct {
 	TxHash        string
 	BatchID       string
 	FeePerRequest uint
+	NumOfRequests uint
 	BlkHeight     uint64 // height of the broadcast tx
 }
 
@@ -168,7 +169,7 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(txArray []*Broa
 			}
 		}
 		if !isExists {
-			// todo: get tx raw content, hash, fee per request
+			// todo: get tx raw content, hash, fee per request, number of requests
 			fmt.Printf("Batch ID: %v\n", batchID)
 		}
 
@@ -358,10 +359,18 @@ func (b *BTCBroadcastingManager) Execute() {
 		lenArray = 0
 		for idx < lenArray {
 			if b.isTimeoutBTCTx(broadcastTxArray[idx].BlkHeight, curIncBlkHeight) { // waiting too long
-				// todo: get new fee (per request?)
-				newFee := uint(0)
+				tx := broadcastTxArray[idx]
+				newFee, err := utils.GetNewFee(len(tx.TxContent), tx.FeePerRequest, tx.NumOfRequests)
+				if err != nil {
+					b.ExportErrorLog(fmt.Sprintf("Could not get new fee - with err: %v", err))
+					return
+				}
 				// notify the Inc chain for fee replacement
-				_, err = b.requestFeeReplacement(broadcastTxArray[idx].BatchID, newFee)
+				_, err = b.requestFeeReplacement(tx.BatchID, newFee)
+				if err != nil {
+					b.ExportErrorLog(fmt.Sprintf("Could not request fee replacement - with err: %v", err))
+					return
+				}
 				broadcastTxArray[lenArray-1], broadcastTxArray[idx] = broadcastTxArray[idx], broadcastTxArray[lenArray-1]
 				lenArray--
 			} else {

@@ -5,8 +5,8 @@ import (
 )
 
 func TestGetNewFee(t *testing.T) {
-	newFee, err := GetNewFee(25, 2000)
+	newFee, err := GetNewFee(30, 25, 40)
 	t.Logf("New fee: %v, err: %v", newFee, err)
-	newFee, err = GetNewFee(25, 3000)
+	newFee, err = GetNewFee(30, 25, 40)
 	t.Logf("New fee: %v, err: %v", newFee, err)
 }
