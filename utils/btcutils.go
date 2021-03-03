@@ -106,7 +106,7 @@ func BuildMsgTxFromCypher(txID string, networkName string) *wire.MsgTx {
 	for _, cypherTxOut := range cypherTx.Outputs {
 		pkScrtip, _ := HexToBytes(cypherTxOut.Script)
 		out := &wire.TxOut{
-			Value:    cypherTxOut.Value.Int64(),
+			Value:    int64(cypherTxOut.Value),
 			PkScript: pkScrtip,
 		}
 		txOuts = append(txOuts, out)

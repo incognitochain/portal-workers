@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
+	metadata2 "github.com/0xkraken/incognito-sdk-golang/metadata"
 	"github.com/0xkraken/incognito-sdk-golang/wallet"
 	"github.com/blockcypher/gobcy"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -31,10 +33,11 @@ type BTCBroadcastingManager struct {
 }
 
 type BroadcastTx struct {
-	TxContent string
-	TxHash    string
-	BatchID   string
-	BlkHeight uint64 // height of the broadcast tx
+	TxContent     string
+	TxHash        string
+	BatchID       string
+	FeePerRequest uint
+	BlkHeight     uint64 // height of the broadcast tx
 }
 
 type BroadcastTxsBlock struct {
@@ -131,12 +134,14 @@ func (b *BTCBroadcastingManager) getLatestBTCBlockHashFromIncog() (uint64, error
 	return uint64(currentBTCBlkHeight), nil
 }
 
-func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(height uint64) *BroadcastTxsBlock {
+func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(txArray []*BroadcastTx, height uint64) *BroadcastTxsBlock {
 	params := []interface{}{
-		height,
+		map[string]string{
+			"BeaconHeight": strconv.FormatUint(height, 10),
+		},
 	}
-	var beaconblockRes entities.BeaconBlockByHeightRes
-	err := b.RPCClient.RPCCall("retrievebeaconblockbyheight", params, &beaconblockRes)
+	var portalStateRes entities.PortalV4StateByHeightRes
+	err := b.RPCClient.RPCCall("getportalv4state", params, &portalStateRes)
 	if err != nil {
 		return &BroadcastTxsBlock{
 			TxArray:   []*BroadcastTx{},
@@ -144,18 +149,29 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(height uint64) 
 			Err:       err,
 		}
 	}
-	if beaconblockRes.RPCError != nil {
-		b.Logger.Errorf("getBroadcastTxsFromBeaconHeight: call RPC error, %v\n", beaconblockRes.RPCError.StackTrace)
+	if portalStateRes.RPCError != nil {
+		b.Logger.Errorf("getportalv4state: call RPC error, %v\n", portalStateRes.RPCError.StackTrace)
 		return &BroadcastTxsBlock{
 			TxArray:   []*BroadcastTx{},
 			BlkHeight: height,
-			Err:       errors.New(beaconblockRes.RPCError.Message),
+			Err:       errors.New(portalStateRes.RPCError.Message),
 		}
 	}
 
-	// todo: get tx raw content, hash, batchID
-	for _, instruction := range beaconblockRes.Result[0].Instructions {
-		fmt.Println(instruction)
+	for _, batch := range portalStateRes.Result.ProcessedUnshieldRequests[BTCID] {
+		batchID := batch.BatchID
+		isExists := false
+		for _, tx := range txArray {
+			if batchID == tx.BatchID {
+				isExists = true
+				break
+			}
+		}
+		if !isExists {
+			// todo: get tx raw content, hash, fee per request
+			fmt.Printf("Batch ID: %v\n", batchID)
+		}
+
 	}
 
 	return &BroadcastTxsBlock{
@@ -207,7 +223,11 @@ func (b *BTCBroadcastingManager) submitConfirmedTx(proof string, batchID string)
 		return "", err
 	}
 	meta, _ := metadata.NewPortalSubmitConfirmedTxRequest(PortalSubmitConfirmedTxMeta, proof, BTCID, batchID)
-	return sendTx(rpcClient, keyWallet, meta)
+	var meta2 metadata2.Metadata
+	var metaIf interface{}
+	metaIf = meta
+	meta2 = metaIf.(metadata2.Metadata)
+	return sendTx(rpcClient, keyWallet, meta2)
 }
 
 func (b *BTCBroadcastingManager) requestFeeReplacement(batchID string, newFee uint) (string, error) {
@@ -217,7 +237,11 @@ func (b *BTCBroadcastingManager) requestFeeReplacement(batchID string, newFee ui
 	}
 	paymentAddrStr := keyWallet.Base58CheckSerialize(wallet.PaymentAddressType)
 	meta, _ := metadata.NewPortalReplacementFeeRequest(PortalReplacementFeeRequestMeta, paymentAddrStr, BTCID, batchID, newFee)
-	return sendTx(rpcClient, keyWallet, meta)
+	var meta2 metadata2.Metadata
+	var metaIf interface{}
+	metaIf = meta
+	meta2 = metaIf.(metadata2.Metadata)
+	return sendTx(rpcClient, keyWallet, meta2)
 }
 
 func (b *BTCBroadcastingManager) Execute() {
@@ -268,7 +292,7 @@ func (b *BTCBroadcastingManager) Execute() {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				broadcastTxsBlockChan <- b.getBroadcastTxsFromBeaconHeight(curIdx)
+				broadcastTxsBlockChan <- b.getBroadcastTxsFromBeaconHeight(broadcastTxArray, curIdx)
 			}()
 		}
 		wg.Wait()
