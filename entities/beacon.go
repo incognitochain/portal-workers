@@ -8,12 +8,3 @@ type BeaconBestStateRes struct {
 	RPCBaseRes
 	Result *BeaconBestState
 }
-
-type BeaconBlockState struct {
-	Instructions [][]string
-}
-
-type BeaconBlockByHeightRes struct {
-	RPCBaseRes
-	Result []*BeaconBlockState
-}
