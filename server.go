@@ -18,7 +18,14 @@ type Server struct {
 
 func NewServer() *Server {
 	listWorkers := []workers.Worker{}
-	listWorkers = append(listWorkers, &workers.WorkerAbs{})
+
+	btcWorker := &workers.BTCBroadcastingManager{}
+	err := btcWorker.Init(1, "BTC Broadcasting Manager", 60, os.Getenv("BTC_NETWORK"))
+	if err != nil {
+		panic("Can't init BTC Broadcasting Manager")
+	}
+
+	listWorkers = append(listWorkers, btcWorker)
 
 	quitChan := make(chan os.Signal, 1)
 	signal.Notify(quitChan, syscall.SIGTERM)

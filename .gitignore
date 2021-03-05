@@ -1,1 +1,4 @@
 portal_workers
+logs
+db
+.env
