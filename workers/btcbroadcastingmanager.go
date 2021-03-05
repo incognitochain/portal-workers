@@ -13,9 +13,9 @@ import (
 
 const InitIncBlockBatchSize = 1000
 const FirstBroadcastTxBlockHeight = 1
-const TimeoutBTCFeeReplacement = 100
+const TimeoutBTCFeeReplacement = 1000
 const ConfirmationThreshold = 6
-const ProcessedBlkCacheDepth = 2000
+const ProcessedBlkCacheDepth = 10000
 
 type BTCBroadcastingManager struct {
 	WorkerAbs
@@ -30,7 +30,7 @@ type BroadcastTx struct {
 	BatchID       string
 	FeePerRequest uint
 	NumOfRequests uint
-	BlkHeight     uint64 // height of the broadcast tx
+	BlkHeight     uint64 // height of the current Incog chain height when broadcasting tx
 }
 
 type FeeReplacementTx struct {
@@ -42,12 +42,6 @@ type FeeReplacementTx struct {
 type ConfirmedTx struct {
 	BatchID   string
 	BlkHeight uint64
-}
-
-type BroadcastTxsBlock struct {
-	TxArray   []*BroadcastTx
-	BlkHeight uint64
-	Err       error
 }
 
 type BroadcastTxArrayObject struct {
@@ -104,6 +98,7 @@ func (b *BTCBroadcastingManager) Execute() {
 	for {
 		curIncBlkHeight, err := b.getLatestBeaconHeight()
 		if err != nil {
+			b.ExportErrorLog(fmt.Sprintf("Could not get latest beacon height - with err: %v", err))
 			return
 		}
 
@@ -121,7 +116,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		if nextBlkHeight+InitIncBlockBatchSize <= curIncBlkHeight { // load until the final view
 			IncBlockBatchSize = InitIncBlockBatchSize
 		} else {
-			IncBlockBatchSize = 1
+			IncBlockBatchSize = curIncBlkHeight - nextBlkHeight
 		}
 
 		fmt.Printf("Next Scan Block Height: %v, Batch Size: %v, Current Block Height: %v\n", nextBlkHeight, IncBlockBatchSize, curIncBlkHeight)
@@ -168,12 +163,12 @@ func (b *BTCBroadcastingManager) Execute() {
 
 		var tempBroadcastTxArray1 []*BroadcastTx
 		var tempBroadcastTxArray2 []*BroadcastTx
-		tempBroadcastTxArray1, err = b.getBroadcastTxsFromBeaconHeight(processedBatchIDs, nextBlkHeight+IncBlockBatchSize-1)
+		tempBroadcastTxArray1, err = b.getBroadcastTxsFromBeaconHeight(processedBatchIDs, nextBlkHeight+IncBlockBatchSize-1, curIncBlkHeight)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve Incognito block - with err: %v", err))
 			return
 		}
-		feeReplacementTxArray, tempBroadcastTxArray2, err = b.getBroadcastReplacementTx(feeReplacementTxArray)
+		feeReplacementTxArray, tempBroadcastTxArray2, err = b.getBroadcastReplacementTx(feeReplacementTxArray, curIncBlkHeight)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve get broadcast txs - with err: %v", err))
 			return
@@ -183,7 +178,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		for _, tx := range tempBroadcastTxArray {
 			err := b.broadcastTx(tx.TxContent)
 			if err != nil {
-				b.ExportErrorLog(fmt.Sprintf("Could not retrieve get broadcast txs - with err: %v", err))
+				b.ExportErrorLog(fmt.Sprintf("Could not broadcast txs - with err: %v", err))
 				return
 			}
 		}
@@ -218,7 +213,7 @@ func (b *BTCBroadcastingManager) Execute() {
 				}
 				confirmedTxArray = append(confirmedTxArray, &ConfirmedTx{
 					BatchID:   broadcastTxArray[idx].BatchID,
-					BlkHeight: nextBlkHeight + IncBlockBatchSize - 1,
+					BlkHeight: curIncBlkHeight,
 				})
 				broadcastTxArray[lenArray-1], broadcastTxArray[idx] = broadcastTxArray[idx], broadcastTxArray[lenArray-1]
 				lenArray--
@@ -242,8 +237,9 @@ func (b *BTCBroadcastingManager) Execute() {
 				// notify the Inc chain for fee replacement
 				txID, err := b.requestFeeReplacement(tx.BatchID, newFee)
 				feeReplacementTxArray = append(feeReplacementTxArray, &FeeReplacementTx{
-					ReqTxID: txID,
-					BatchID: tx.BatchID,
+					ReqTxID:   txID,
+					BatchID:   tx.BatchID,
+					BlkHeight: curIncBlkHeight,
 				})
 				if err != nil {
 					b.ExportErrorLog(fmt.Sprintf("Could not request fee replacement - with err: %v", err))
