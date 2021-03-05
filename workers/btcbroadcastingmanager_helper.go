@@ -92,7 +92,7 @@ func (b *BTCBroadcastingManager) getLatestBTCBlockHashFromIncog() (uint64, error
 	return uint64(currentBTCBlkHeight), nil
 }
 
-func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchIDs map[string]bool, height uint64) ([]*BroadcastTx, error) {
+func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchIDs map[string]bool, height uint64, curIncBlkHeight uint64) ([]*BroadcastTx, error) {
 	txArray := []*BroadcastTx{}
 	var params []interface{}
 
@@ -142,14 +142,14 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchI
 				BatchID:       batch.BatchID,
 				FeePerRequest: feePerRequest,
 				NumOfRequests: numberRequest,
-				BlkHeight:     signedRawTxRes.Result.BeaconHeight,
+				BlkHeight:     curIncBlkHeight,
 			})
 		}
 	}
 	return txArray, nil
 }
 
-func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray []*FeeReplacementTx) ([]*FeeReplacementTx, []*BroadcastTx, error) {
+func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray []*FeeReplacementTx, curIncBlkHeight uint64) ([]*FeeReplacementTx, []*BroadcastTx, error) {
 	var params []interface{}
 	idx := 0
 	lenArray := len(feeReplacementTxArray)
@@ -181,7 +181,7 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 				BatchID:       tx.BatchID,
 				FeePerRequest: feePerRequest,
 				NumOfRequests: numberRequest,
-				BlkHeight:     signedRawTxRes.Result.BeaconHeight,
+				BlkHeight:     curIncBlkHeight,
 			})
 			idx++
 		} else {
