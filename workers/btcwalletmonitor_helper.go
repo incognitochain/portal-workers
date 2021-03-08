@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	metadata2 "github.com/0xkraken/incognito-sdk-golang/metadata"
 	"github.com/0xkraken/incognito-sdk-golang/wallet"
 	"github.com/blockcypher/gobcy"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/incognitochain/incognito-chain/portalv4/metadata"
+	"github.com/incognitochain/portal-workers/metadata"
 	"github.com/incognitochain/portal-workers/utils"
 )
 
@@ -64,18 +63,14 @@ func (b *BTCWalletMonitor) submitShieldingRequest(incAddress string, proof strin
 		return "", err
 	}
 	meta, _ := metadata.NewPortalShieldingRequest(PortalShieldingRequestMeta, BTCID, incAddress, proof)
-	var meta2 metadata2.Metadata
-	var metaIf interface{}
-	metaIf = meta
-	meta2 = metaIf.(metadata2.Metadata)
-	return sendTx(rpcClient, keyWallet, meta2)
+	return sendTx(rpcClient, keyWallet, meta)
 }
 
 func (b *BTCWalletMonitor) extractMemo(memo string) (string, error) {
 	if len(memo) <= 4 {
 		return "", fmt.Errorf("The memo is too short")
 	}
-	if memo[:4] != "SP1-" {
+	if memo[:4] != "PS1-" {
 		return "", fmt.Errorf("Memo prefix is not match")
 	}
 

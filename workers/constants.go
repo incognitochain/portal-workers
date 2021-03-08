@@ -11,5 +11,5 @@ const (
 	PortalReplacementFeeRequestMeta = 253
 	PortalSubmitConfirmedTxMeta     = 254
 
-	MultisigAddress = ""
+	MultisigAddress = "2MvpFqydTR43TT4emMD84Mzhgd8F6dCow1X"
 )
