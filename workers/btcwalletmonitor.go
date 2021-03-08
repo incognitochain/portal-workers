@@ -70,37 +70,42 @@ func (b *BTCWalletMonitor) Execute() {
 
 		for _, tx := range addrInfo.TXs {
 			if b.isReceivingTx(&tx) {
+				fmt.Printf("Checking tx: %v\n", tx.Hash)
 				// gen proof
-				proof, err := b.buildProof(tx.BlockHash, uint64(tx.BlockHeight))
+				proof, err := b.buildProof(tx.Hash, uint64(tx.BlockHeight))
 				if err != nil {
-					b.ExportErrorLog(fmt.Sprintf("Could not build for tx: %v - with err: %v", tx.BlockHash, err))
+					b.ExportErrorLog(fmt.Sprintf("Could not build for tx: %v - with err: %v", tx.Hash, err))
 					continue
 				}
 
 				// get memo, check valid
 				btcTxProof, err := btcrelaying.ParseBTCProofFromB64EncodeStr(proof)
 				if err != nil {
-					b.ExportErrorLog(fmt.Sprintf("ShieldingProof for tx %v is invalid %v\n", tx.BlockHash, err))
+					b.ExportErrorLog(fmt.Sprintf("ShieldingProof for tx %v is invalid %v\n", tx.Hash, err))
 					continue
 				}
 				btcAttachedMsg, err := btcrelaying.ExtractAttachedMsgFromTx(btcTxProof.BTCTx)
 				if err != nil {
-					b.ExportErrorLog(fmt.Sprintf("Could not extract attached message from BTC tx %v proof with err: %v", tx.BlockHash, err))
+					b.ExportErrorLog(fmt.Sprintf("Could not extract attached message from BTC tx %v proof with err: %v", tx.Hash, err))
 					continue
 				}
 
 				incAddress, err := b.extractMemo(btcAttachedMsg)
 				if err != nil {
-					// send RPC
-					_, err := b.submitShieldingRequest(incAddress, proof)
-					if err != nil {
-						b.ExportErrorLog(fmt.Sprintf("Could not send shielding request from BTC tx %v proof with err: %v", tx.BlockHash, err))
-						continue
-					}
-					// update last btc block height tracked
-					if uint64(tx.BlockHeight) > lastBTCHeightTracked {
-						lastBTCHeightTracked = uint64(tx.BlockHeight)
-					}
+					b.ExportErrorLog(fmt.Sprintf("Could not extract incognito address in memo %v from tx %v with err: %v", btcAttachedMsg, tx.Hash, err))
+					continue
+				}
+
+				fmt.Printf("Found shielding request for address %v, with BTC tx %v\n", incAddress, tx.Hash)
+				// send RPC
+				_, err = b.submitShieldingRequest(incAddress, proof)
+				if err != nil {
+					b.ExportErrorLog(fmt.Sprintf("Could not send shielding request from BTC tx %v proof with err: %v", tx.Hash, err))
+					continue
+				}
+				// update last btc block height tracked
+				if uint64(tx.BlockHeight) > lastBTCHeightTracked {
+					lastBTCHeightTracked = uint64(tx.BlockHeight)
 				}
 
 			}
