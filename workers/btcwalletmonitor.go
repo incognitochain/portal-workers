@@ -59,8 +59,9 @@ func (b *BTCWalletMonitor) Execute() {
 	}
 
 	for {
+		fmt.Printf("=== Scan tx from BTC block height: %v ===\n", lastBTCHeightTracked+1)
 		addrInfo, err := b.bcy.GetAddrFull(MultisigAddress, map[string]string{
-			"after":         strconv.FormatUint(lastBTCHeightTracked, 10),
+			"after":         strconv.FormatUint(lastBTCHeightTracked+1, 10),
 			"confirmations": strconv.FormatInt(int64(ConfirmationThreshold), 10),
 		})
 		if err != nil {
@@ -69,6 +70,12 @@ func (b *BTCWalletMonitor) Execute() {
 		}
 
 		for _, tx := range addrInfo.TXs {
+			time.Sleep(1 * time.Second)
+			// update last btc block height tracked
+			if uint64(tx.BlockHeight) > lastBTCHeightTracked {
+				lastBTCHeightTracked = uint64(tx.BlockHeight)
+			}
+
 			if b.isReceivingTx(&tx) {
 				fmt.Printf("Checking tx: %v\n", tx.Hash)
 				// gen proof
@@ -103,11 +110,6 @@ func (b *BTCWalletMonitor) Execute() {
 					b.ExportErrorLog(fmt.Sprintf("Could not send shielding request from BTC tx %v proof with err: %v", tx.Hash, err))
 					continue
 				}
-				// update last btc block height tracked
-				if uint64(tx.BlockHeight) > lastBTCHeightTracked {
-					lastBTCHeightTracked = uint64(tx.BlockHeight)
-				}
-
 			}
 		}
 
