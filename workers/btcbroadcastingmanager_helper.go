@@ -7,11 +7,10 @@ import (
 	"fmt"
 	"strconv"
 
-	metadata2 "github.com/0xkraken/incognito-sdk-golang/metadata"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/incognitochain/incognito-chain/portalv4/metadata"
 	"github.com/incognitochain/incognito-chain/wallet"
 	"github.com/incognitochain/portal-workers/entities"
+	"github.com/incognitochain/portal-workers/metadata"
 	"github.com/incognitochain/portal-workers/utils"
 )
 
@@ -236,11 +235,7 @@ func (b *BTCBroadcastingManager) submitConfirmedTx(proof string, batchID string)
 		return "", err
 	}
 	meta, _ := metadata.NewPortalSubmitConfirmedTxRequest(PortalSubmitConfirmedTxMeta, proof, BTCID, batchID)
-	var meta2 metadata2.Metadata
-	var metaIf interface{}
-	metaIf = meta
-	meta2 = metaIf.(metadata2.Metadata)
-	return sendTx(rpcClient, keyWallet, meta2)
+	return sendTx(rpcClient, keyWallet, meta)
 }
 
 func (b *BTCBroadcastingManager) requestFeeReplacement(batchID string, newFee uint) (string, error) {
@@ -250,9 +245,5 @@ func (b *BTCBroadcastingManager) requestFeeReplacement(batchID string, newFee ui
 	}
 	paymentAddrStr := keyWallet.Base58CheckSerialize(wallet.PaymentAddressType)
 	meta, _ := metadata.NewPortalReplacementFeeRequest(PortalReplacementFeeRequestMeta, paymentAddrStr, BTCID, batchID, newFee)
-	var meta2 metadata2.Metadata
-	var metaIf interface{}
-	metaIf = meta
-	meta2 = metaIf.(metadata2.Metadata)
-	return sendTx(rpcClient, keyWallet, meta2)
+	return sendTx(rpcClient, keyWallet, meta)
 }
