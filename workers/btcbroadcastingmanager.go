@@ -14,7 +14,6 @@ import (
 const InitIncBlockBatchSize = 1000
 const FirstBroadcastTxBlockHeight = 1
 const TimeoutBTCFeeReplacement = 1000
-const ConfirmationThreshold = 6
 const ProcessedBlkCacheDepth = 10000
 
 type BTCBroadcastingManager struct {
@@ -76,7 +75,7 @@ func (b *BTCBroadcastingManager) ExportErrorLog(msg string) {
 }
 
 func (b *BTCBroadcastingManager) Execute() {
-	b.Logger.Info("BTCBroadcastingManager agent is executing...")
+	b.Logger.Info("BTCBroadcastingManager worker is executing...")
 	defer b.db.Close()
 
 	nextBlkHeight := uint64(FirstBroadcastTxBlockHeight)
