@@ -61,7 +61,7 @@ func (b *BTCBroadcastingManager) Init(id int, name string, freq int, network str
 	}
 
 	// init leveldb instance
-	b.db, err = leveldb.OpenFile("db", nil)
+	b.db, err = leveldb.OpenFile("db/broadcastingmanager", nil)
 	if err != nil {
 		b.ExportErrorLog(fmt.Sprintf("Could not open leveldb storage file - with err: %v", err))
 		return err
