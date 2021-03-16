@@ -77,7 +77,7 @@ func (b *BTCWalletMonitor) Execute() {
 			}
 
 			if b.isReceivingTx(&tx) {
-				fmt.Printf("Checking tx: %v\n", tx.Hash)
+				fmt.Printf("Checking tx %v from height %v\n", tx.Hash, tx.BlockHeight)
 				// gen proof
 				proof, err := b.buildProof(tx.Hash, uint64(tx.BlockHeight))
 				if err != nil {
@@ -105,11 +105,12 @@ func (b *BTCWalletMonitor) Execute() {
 
 				fmt.Printf("Found shielding request for address %v, with BTC tx %v\n", incAddress, tx.Hash)
 				// send RPC
-				_, err = b.submitShieldingRequest(incAddress, proof)
+				txID, err := b.submitShieldingRequest(incAddress, proof)
 				if err != nil {
 					b.ExportErrorLog(fmt.Sprintf("Could not send shielding request from BTC tx %v proof with err: %v", tx.Hash, err))
 					continue
 				}
+				fmt.Printf("Shielding txID: %v\n", txID)
 			}
 		}
 
