@@ -29,9 +29,9 @@ func (b *BTCBroadcastingManager) isConfirmedBTCTx(txHash string) (bool, uint64) 
 }
 
 func (b *BTCBroadcastingManager) broadcastTx(txContent string) error {
-	skel, err := b.bcy.PushTX(txContent)
+	_, err := b.bcy.PushTX(txContent)
 	if err != nil {
-		b.ExportErrorLog(fmt.Sprintf("Could not broadcast tx to BTC chain - with err: %v \n Decoded tx: %v", err, skel))
+		b.ExportErrorLog(fmt.Sprintf("Could not broadcast tx content %v to BTC chain - with err: %v \n", txContent, err))
 		return err
 	}
 	return nil

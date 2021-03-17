@@ -20,11 +20,11 @@ func NewServer() *Server {
 	listWorkers := []workers.Worker{}
 	var err error
 
-	// btcWorker := &workers.BTCBroadcastingManager{}
-	// err = btcWorker.Init(1, "BTC Broadcasting Manager", 60, os.Getenv("BTC_NETWORK"))
-	// if err != nil {
-	// 	panic("Can't init BTC Broadcasting Manager")
-	// }
+	btcBroadcastingManager := &workers.BTCBroadcastingManager{}
+	err = btcBroadcastingManager.Init(1, "BTC Broadcasting Manager", 60, os.Getenv("BTC_NETWORK"))
+	if err != nil {
+		panic("Can't init BTC Broadcasting Manager")
+	}
 
 	btcWalletMonitorWorker := &workers.BTCWalletMonitor{}
 	err = btcWalletMonitorWorker.Init(1, "BTC Wallet Monitor", 60, os.Getenv("BTC_NETWORK"))
@@ -32,7 +32,7 @@ func NewServer() *Server {
 		panic("Can't init BTC Wallet Monitor")
 	}
 
-	// listWorkers = append(listWorkers, btcWorker)
+	listWorkers = append(listWorkers, btcBroadcastingManager)
 	listWorkers = append(listWorkers, btcWalletMonitorWorker)
 
 	quitChan := make(chan os.Signal, 1)

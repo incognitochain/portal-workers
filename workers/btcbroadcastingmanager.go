@@ -175,10 +175,11 @@ func (b *BTCBroadcastingManager) Execute() {
 		tempBroadcastTxArray := append(tempBroadcastTxArray1, tempBroadcastTxArray2...)
 
 		for _, tx := range tempBroadcastTxArray {
+			fmt.Printf("Got broadcast tx: %v %v\n", tx.BatchID, tx.TxContent)
 			err := b.broadcastTx(tx.TxContent)
 			if err != nil {
 				b.ExportErrorLog(fmt.Sprintf("Could not broadcast txs - with err: %v", err))
-				return
+				continue
 			}
 		}
 		broadcastTxArray = append(broadcastTxArray, tempBroadcastTxArray...)
