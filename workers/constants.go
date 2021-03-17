@@ -7,9 +7,9 @@ const (
 	BTCID                 = "ef5947f70ead81a76a53c7c8b7317dd5245510c665d3a13921dc9a581188728b"
 	ConfirmationThreshold = 6
 
-	PortalShieldingRequestMeta      = 251
+	PortalShieldingRequestMeta      = 250
 	PortalReplacementFeeRequestMeta = 253
 	PortalSubmitConfirmedTxMeta     = 254
 
-	MultisigAddress = "2MvpFqydTR43TT4emMD84Mzhgd8F6dCow1X"
+	MultisigAddress = "2NGFTTKNj59NGmjQpajsEXGxwf9SP8gvJiv"
 )

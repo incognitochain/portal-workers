@@ -14,4 +14,4 @@ require (
 	golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899
 )
 
-replace github.com/incognitochain/incognito-chain => /Users/macbook_autonomous/go/src/github.com/incognitochain/incognito-chain-tmp
+replace github.com/incognitochain/incognito-chain => /Users/macbook_autonomous/go/src/github.com/incognitochain/incognito-chain
