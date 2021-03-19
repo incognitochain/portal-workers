@@ -33,9 +33,11 @@ type BroadcastTx struct {
 }
 
 type FeeReplacementTx struct {
-	ReqTxID   string
-	BatchID   string
-	BlkHeight uint64
+	ReqTxID       string
+	BatchID       string
+	FeePerRequest uint
+	NumOfRequests uint
+	BlkHeight     uint64
 }
 
 type ConfirmedTx struct {
@@ -237,9 +239,11 @@ func (b *BTCBroadcastingManager) Execute() {
 				// notify the Inc chain for fee replacement
 				txID, err := b.requestFeeReplacement(tx.BatchID, newFee)
 				feeReplacementTxArray = append(feeReplacementTxArray, &FeeReplacementTx{
-					ReqTxID:   txID,
-					BatchID:   tx.BatchID,
-					BlkHeight: curIncBlkHeight,
+					ReqTxID:       txID,
+					BatchID:       tx.BatchID,
+					FeePerRequest: newFee,
+					NumOfRequests: tx.NumOfRequests,
+					BlkHeight:     curIncBlkHeight,
 				})
 				if err != nil {
 					b.ExportErrorLog(fmt.Sprintf("Could not request fee replacement - with err: %v", err))

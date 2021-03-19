@@ -1,7 +1,9 @@
 package entities
 
 type ProcessedUnshieldRequestBatch struct {
-	BatchID string
+	BatchID      string
+	UnshieldsID  []string
+	ExternalFees map[uint64]uint
 }
 
 type PortalV4State struct {

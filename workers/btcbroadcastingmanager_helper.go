@@ -38,21 +38,14 @@ func (b *BTCBroadcastingManager) broadcastTx(txContent string) error {
 }
 
 // Return fee per unshield request and number of requests
-func (b *BTCBroadcastingManager) getUnshieldTxInfo(btcTxContent string) (uint, uint) {
-	skel, err := b.bcy.DecodeTX(btcTxContent)
-	if err != nil {
-		panic(fmt.Sprintf("Can't parse tx content: %v", btcTxContent))
-	}
-	fee := skel.Trans.Fees
-	numberOfRequest := uint(0)
-
-	for _, address := range skel.Trans.Addresses {
-		if address != MultisigAddress {
-			numberOfRequest++
+func (b *BTCBroadcastingManager) getLatestBatchInfo(batch *entities.ProcessedUnshieldRequestBatch) (uint, uint) {
+	maxFee := uint(0)
+	for _, fee := range batch.ExternalFees {
+		if fee > maxFee {
+			maxFee = fee
 		}
 	}
-
-	return uint(fee), numberOfRequest
+	return maxFee, uint(len(batch.UnshieldsID))
 }
 
 func (b *BTCBroadcastingManager) getLatestBeaconHeight() (uint64, error) {
@@ -134,7 +127,7 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchI
 				return txArray, err
 			}
 			btcTxHash := btcTx.Trans.Hash
-			feePerRequest, numberRequest := b.getUnshieldTxInfo(btcTxContent)
+			feePerRequest, numberRequest := b.getLatestBatchInfo(batch)
 			txArray = append(txArray, &BroadcastTx{
 				TxContent:     btcTxContent,
 				TxHash:        btcTxHash,
@@ -173,19 +166,18 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 				return feeReplacementTxArray, txArray, err
 			}
 			btcTxHash := btcTx.Trans.Hash
-			feePerRequest, numberRequest := b.getUnshieldTxInfo(btcTxContent)
 			txArray = append(txArray, &BroadcastTx{
 				TxContent:     btcTxContent,
 				TxHash:        btcTxHash,
 				BatchID:       tx.BatchID,
-				FeePerRequest: feePerRequest,
-				NumOfRequests: numberRequest,
+				FeePerRequest: tx.FeePerRequest,
+				NumOfRequests: tx.NumOfRequests,
 				BlkHeight:     curIncBlkHeight,
 			})
-			idx++
-		} else {
 			feeReplacementTxArray[lenArray-1], feeReplacementTxArray[idx] = feeReplacementTxArray[idx], feeReplacementTxArray[lenArray-1]
 			lenArray--
+		} else {
+			idx++
 		}
 	}
 	feeReplacementTxArray = feeReplacementTxArray[:lenArray]

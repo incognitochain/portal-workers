@@ -29,9 +29,9 @@ func GetNewFee(txSize int, oldFeePerUnshieldRequest uint, numberOfUnshieldReques
 		return 0, err
 	}
 
-	newFee := responseBody.HalfHourFee * uint64(txSize)
+	newFee := uint64(float64(responseBody.HalfHourFee) * float64(txSize) * 1.2)
 	if newFee < oldFee {
-		newFee = responseBody.FastestFee * uint64(txSize)
+		newFee = uint64(float64(responseBody.FastestFee) * float64(txSize) * 1.2)
 	}
 	if newFee < oldFee {
 		newFee = uint64(float64(oldFee) * 1.2)
