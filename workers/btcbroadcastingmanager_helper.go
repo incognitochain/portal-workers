@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/incognitochain/incognito-chain/wallet"
@@ -84,8 +85,8 @@ func (b *BTCBroadcastingManager) getLatestBTCBlockHashFromIncog() (uint64, error
 	return uint64(currentBTCBlkHeight), nil
 }
 
-func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchIDs map[string]bool, height uint64, curIncBlkHeight uint64) ([]*BroadcastTx, error) {
-	txArray := []*BroadcastTx{}
+func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchIDs map[string]bool, height uint64, curIncBlkHeight uint64) (map[string]*BroadcastTx, error) {
+	txArray := map[string]*BroadcastTx{}
 	var params []interface{}
 
 	params = []interface{}{
@@ -128,27 +129,23 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchI
 			}
 			btcTxHash := btcTx.Trans.Hash
 			feePerRequest, numberRequest := b.getLatestBatchInfo(batch)
-			txArray = append(txArray, &BroadcastTx{
+			txArray[batch.BatchID] = &BroadcastTx{
 				TxContent:     btcTxContent,
 				TxHash:        btcTxHash,
-				BatchID:       batch.BatchID,
 				FeePerRequest: feePerRequest,
 				NumOfRequests: numberRequest,
 				BlkHeight:     curIncBlkHeight,
-			})
+			}
 		}
 	}
 	return txArray, nil
 }
 
-func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray []*FeeReplacementTx, curIncBlkHeight uint64) ([]*FeeReplacementTx, []*BroadcastTx, error) {
+func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray map[string]*FeeReplacementTx, curIncBlkHeight uint64) (map[string]*FeeReplacementTx, map[string]*BroadcastTx, error) {
 	var params []interface{}
-	idx := 0
-	lenArray := len(feeReplacementTxArray)
-	txArray := []*BroadcastTx{}
+	txArray := map[string]*BroadcastTx{}
 
-	for idx < lenArray {
-		tx := feeReplacementTxArray[idx]
+	for batchID, tx := range feeReplacementTxArray {
 		params = []interface{}{
 			map[string]string{
 				"TxID": tx.ReqTxID,
@@ -166,21 +163,17 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 				return feeReplacementTxArray, txArray, err
 			}
 			btcTxHash := btcTx.Trans.Hash
-			txArray = append(txArray, &BroadcastTx{
+			txArray[batchID] = &BroadcastTx{
 				TxContent:     btcTxContent,
 				TxHash:        btcTxHash,
-				BatchID:       tx.BatchID,
 				FeePerRequest: tx.FeePerRequest,
 				NumOfRequests: tx.NumOfRequests,
 				BlkHeight:     curIncBlkHeight,
-			})
-			feeReplacementTxArray[lenArray-1], feeReplacementTxArray[idx] = feeReplacementTxArray[idx], feeReplacementTxArray[lenArray-1]
-			lenArray--
-		} else {
-			idx++
+			}
+
+			delete(feeReplacementTxArray, batchID)
 		}
 	}
-	feeReplacementTxArray = feeReplacementTxArray[:lenArray]
 
 	return feeReplacementTxArray, txArray, nil
 }
@@ -230,6 +223,33 @@ func (b *BTCBroadcastingManager) submitConfirmedTx(proof string, batchID string)
 	return sendTx(rpcClient, keyWallet, meta)
 }
 
+func (b *BTCBroadcastingManager) getSubmitConfirmedTxStatus(txID string) error {
+	params := []interface{}{
+		map[string]string{
+			"ReqTxID": txID,
+		},
+	}
+
+	var confirmedTxStatusRes entities.ConfirmedTxStatusRes
+
+	var err error
+	for idx := 0; idx < NUM_GET_STATUS_TRIES; idx++ {
+		err = b.RPCClient.RPCCall("getportalsubmitconfirmedtxstatus", params, &confirmedTxStatusRes)
+		if err == nil && confirmedTxStatusRes.RPCError == nil && confirmedTxStatusRes.Result.Status == 1 {
+			return nil
+		}
+		time.Sleep(INTERVAL_TRIES)
+	}
+
+	if err != nil {
+		return err
+	} else if confirmedTxStatusRes.RPCError != nil {
+		return fmt.Errorf(confirmedTxStatusRes.RPCError.Message)
+	} else {
+		return fmt.Errorf("Submit confirmed transaction failed")
+	}
+}
+
 func (b *BTCBroadcastingManager) requestFeeReplacement(batchID string, newFee uint) (string, error) {
 	rpcClient, keyWallet, err := initSetParams(b.RPCClient)
 	if err != nil {
@@ -238,4 +258,42 @@ func (b *BTCBroadcastingManager) requestFeeReplacement(batchID string, newFee ui
 	paymentAddrStr := keyWallet.Base58CheckSerialize(wallet.PaymentAddressType)
 	meta, _ := metadata.NewPortalReplacementFeeRequest(PortalReplacementFeeRequestMeta, paymentAddrStr, BTCID, batchID, newFee)
 	return sendTx(rpcClient, keyWallet, meta)
+}
+
+func (b *BTCBroadcastingManager) getRequestFeeReplacementTxStatus(txID string) error {
+	params := []interface{}{
+		map[string]string{
+			"ReqTxID": txID,
+		},
+	}
+
+	var feeReplacementStatusRes entities.FeeReplacementStatusRes
+
+	var err error
+	for idx := 0; idx < NUM_GET_STATUS_TRIES; idx++ {
+		err = b.RPCClient.RPCCall("getportalreplacementfeestatus", params, &feeReplacementStatusRes)
+		if err == nil && feeReplacementStatusRes.RPCError == nil && feeReplacementStatusRes.Result.Status == 1 {
+			return nil
+		}
+		time.Sleep(INTERVAL_TRIES)
+	}
+
+	if err != nil {
+		return err
+	} else if feeReplacementStatusRes.RPCError != nil {
+		return fmt.Errorf(feeReplacementStatusRes.RPCError.Message)
+	} else {
+		return fmt.Errorf("Request fee replacement failed")
+	}
+}
+
+func joinTxArray(array1 map[string]*BroadcastTx, array2 map[string]*BroadcastTx) map[string]*BroadcastTx {
+	joinedArray := map[string]*BroadcastTx{}
+	for batchID, value := range array1 {
+		joinedArray[batchID] = value
+	}
+	for batchID, value := range array2 {
+		joinedArray[batchID] = value
+	}
+	return joinedArray
 }
