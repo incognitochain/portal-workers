@@ -4,10 +4,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/0xkraken/incognito-sdk-golang/wallet"
 	"github.com/blockcypher/gobcy"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/incognitochain/portal-workers/entities"
 	"github.com/incognitochain/portal-workers/metadata"
 	"github.com/incognitochain/portal-workers/utils"
 )
@@ -89,4 +91,31 @@ func (b *BTCWalletMonitor) extractMemo(memo string) (string, error) {
 	return incAddress, nil
 
 	// privacy v2
+}
+
+func (b *BTCWalletMonitor) getRequestShieldingStatus(txID string) error {
+	params := []interface{}{
+		map[string]string{
+			"ReqTxID": txID,
+		},
+	}
+
+	var requestShieldingStatusRes entities.RequestStatusRes
+
+	var err error
+	for idx := 0; idx < NUM_GET_STATUS_TRIES; idx++ {
+		err = b.RPCClient.RPCCall("getportalshieldingrequeststatus", params, &requestShieldingStatusRes)
+		if err == nil && requestShieldingStatusRes.RPCError == nil && requestShieldingStatusRes.Result.Status == 1 {
+			return nil
+		}
+		time.Sleep(INTERVAL_TRIES)
+	}
+
+	if err != nil {
+		return err
+	} else if requestShieldingStatusRes.RPCError != nil {
+		return fmt.Errorf(requestShieldingStatusRes.RPCError.Message)
+	} else {
+		return fmt.Errorf("Request shielding failed")
+	}
 }

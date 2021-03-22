@@ -230,7 +230,7 @@ func (b *BTCBroadcastingManager) getSubmitConfirmedTxStatus(txID string) error {
 		},
 	}
 
-	var confirmedTxStatusRes entities.ConfirmedTxStatusRes
+	var confirmedTxStatusRes entities.RequestStatusRes
 
 	var err error
 	for idx := 0; idx < NUM_GET_STATUS_TRIES; idx++ {
@@ -267,7 +267,7 @@ func (b *BTCBroadcastingManager) getRequestFeeReplacementTxStatus(txID string) e
 		},
 	}
 
-	var feeReplacementStatusRes entities.FeeReplacementStatusRes
+	var feeReplacementStatusRes entities.RequestStatusRes
 
 	var err error
 	for idx := 0; idx < NUM_GET_STATUS_TRIES; idx++ {
