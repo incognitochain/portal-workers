@@ -111,11 +111,13 @@ func (b *BTCWalletMonitor) Execute() {
 					continue
 				}
 				fmt.Printf("Shielding txID: %v\n", txID)
-				err = b.getRequestShieldingStatus(txID)
-				if err != nil {
-					b.ExportErrorLog(fmt.Sprintf("Could not get request shielding status from BTC tx %v - with err: %v", tx.Hash, err))
-					return
-				}
+				go func() {
+					err = b.getRequestShieldingStatus(txID)
+					if err != nil {
+						b.ExportErrorLog(fmt.Sprintf("Could not get request shielding status from BTC tx %v - with err: %v", tx.Hash, err))
+						return
+					}
+				}()
 			}
 		}
 

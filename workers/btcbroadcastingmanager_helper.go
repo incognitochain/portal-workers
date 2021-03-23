@@ -1,7 +1,9 @@
 package workers
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -123,11 +125,18 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchI
 			}
 
 			btcTxContent := signedRawTxRes.Result.SignedTx
-			btcTx, err := b.bcy.DecodeTX(btcTxContent)
+			data, err := hex.DecodeString(btcTxContent)
 			if err != nil {
+				b.Logger.Errorf("get tx hash error, %v\n", err)
 				return txArray, err
 			}
-			btcTxHash := btcTx.Trans.Hash
+			hash := sha256.Sum256(data)
+			hash = sha256.Sum256(hash[:])
+			for i, j := 0, len(hash)-1; i < j; i, j = i+1, j-1 {
+				hash[i], hash[j] = hash[j], hash[i]
+			}
+			btcTxHash := fmt.Sprintf("%x", hash[:])
+
 			feePerRequest, numberRequest := b.getLatestBatchInfo(batch)
 			txArray[batch.BatchID] = &BroadcastTx{
 				TxContent:     btcTxContent,
@@ -158,11 +167,18 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 		}
 		if signedRawTxRes.RPCError == nil {
 			btcTxContent := signedRawTxRes.Result.SignedTx
-			btcTx, err := b.bcy.DecodeTX(btcTxContent)
+			data, err := hex.DecodeString(btcTxContent)
 			if err != nil {
+				b.Logger.Errorf("get tx hash error, %v\n", err)
 				return feeReplacementTxArray, txArray, err
 			}
-			btcTxHash := btcTx.Trans.Hash
+			hash := sha256.Sum256(data)
+			hash = sha256.Sum256(hash[:])
+			for i, j := 0, len(hash)-1; i < j; i, j = i+1, j-1 {
+				hash[i], hash[j] = hash[j], hash[i]
+			}
+			btcTxHash := fmt.Sprintf("%x", hash[:])
+
 			txArray[batchID] = &BroadcastTx{
 				TxContent:     btcTxContent,
 				TxHash:        btcTxHash,
