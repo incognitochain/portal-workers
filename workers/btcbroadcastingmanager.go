@@ -220,6 +220,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		}
 		wg.Wait()
 
+		close(confirmedBatchIDChan)
 		for batch := range confirmedBatchIDChan {
 			for batchID, tx := range batch {
 				confirmedTxArray[batchID] = tx
@@ -268,6 +269,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		}
 		wg.Wait()
 
+		close(replacedBatchIDChan)
 		for batch := range replacedBatchIDChan {
 			for batchID, tx := range batch {
 				feeReplacementTxArray[batchID] = tx
