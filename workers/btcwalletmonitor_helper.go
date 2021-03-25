@@ -3,6 +3,7 @@ package workers
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -68,31 +69,6 @@ func (b *BTCWalletMonitor) submitShieldingRequest(incAddress string, proof strin
 	return sendTx(rpcClient, keyWallet, meta)
 }
 
-func (b *BTCWalletMonitor) extractMemo(memo string) (string, error) {
-	if len(memo) <= 4 {
-		return "", fmt.Errorf("The memo is too short")
-	}
-	if memo[:4] != "PS1-" {
-		return "", fmt.Errorf("Memo prefix is not match")
-	}
-
-	// privacy v1
-	incAddress := memo[4:]
-	// validate IncogAddressStr
-	keyWallet, err := wallet.Base58CheckDeserialize(incAddress)
-	if err != nil {
-		return "", fmt.Errorf("Incognito address is invalid")
-	}
-	incogAddr := keyWallet.KeySet.PaymentAddress
-	if len(incogAddr.Pk) == 0 {
-		return "", fmt.Errorf("Incognito address is invalid")
-	}
-
-	return incAddress, nil
-
-	// privacy v2
-}
-
 func (b *BTCWalletMonitor) getRequestShieldingStatus(txID string) error {
 	params := []interface{}{
 		map[string]string{
@@ -118,4 +94,50 @@ func (b *BTCWalletMonitor) getRequestShieldingStatus(txID string) error {
 	} else {
 		return fmt.Errorf("Request shielding failed")
 	}
+}
+
+func (b *BTCWalletMonitor) extractMemo(memo string) (string, error) {
+	if len(memo) <= 4 {
+		return "", fmt.Errorf("The memo is too short")
+	}
+	if memo[:4] != "PS1-" {
+		return "", fmt.Errorf("Memo prefix is not match")
+	}
+
+	// privacy v1
+	incAddress := memo[4:]
+	// validate IncogAddressStr
+	keyWallet, err := wallet.Base58CheckDeserialize(incAddress)
+	if err != nil {
+		return "", fmt.Errorf("Incognito address is invalid")
+	}
+	incogAddr := keyWallet.KeySet.PaymentAddress
+	if len(incogAddr.Pk) == 0 {
+		return "", fmt.Errorf("Incognito address is invalid")
+	}
+
+	return incAddress, nil
+
+	// privacy v2
+}
+
+func (b *BTCWalletMonitor) getLatestBTCBlockHashFromIncog() (uint64, error) {
+	params := []interface{}{}
+	var btcRelayingBestStateRes entities.BTCRelayingBestStateRes
+	err := b.RPCClient.RPCCall("getbtcrelayingbeststate", params, &btcRelayingBestStateRes)
+	if err != nil {
+		return 0, err
+	}
+	if btcRelayingBestStateRes.RPCError != nil {
+		b.Logger.Errorf("getLatestBTCBlockHashFromIncog: call RPC error, %v\n", btcRelayingBestStateRes.RPCError.StackTrace)
+		return 0, errors.New(btcRelayingBestStateRes.RPCError.Message)
+	}
+
+	// check whether there was a fork happened or not
+	btcBestState := btcRelayingBestStateRes.Result
+	if btcBestState == nil {
+		return 0, errors.New("BTC relaying best state is nil")
+	}
+	currentBTCBlkHeight := btcBestState.Height
+	return uint64(currentBTCBlkHeight), nil
 }

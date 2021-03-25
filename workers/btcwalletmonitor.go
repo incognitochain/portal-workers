@@ -19,6 +19,17 @@ type BTCWalletMonitor struct {
 	db       *leveldb.DB
 }
 
+type ShieldingInfo struct {
+	IncAddress     string
+	Proof          string
+	BTCBlockHeight uint64
+}
+
+type ShieldingTxArrayObject struct {
+	LastBTCHeightTracked uint64
+	WaitingShieldingList map[string]*ShieldingInfo
+}
+
 func (b *BTCWalletMonitor) Init(id int, name string, freq int, network string) error {
 	err := b.WorkerAbs.Init(id, name, freq, network)
 	// init blockcypher instance
@@ -48,6 +59,15 @@ func (b *BTCWalletMonitor) Execute() {
 	defer b.db.Close()
 
 	lastBTCHeightTracked := uint64(0)
+	waitingShieldingList := map[string]*ShieldingInfo{}
+
+	lastUpdateBytes, err := b.db.Get([]byte("BTCMonitor-LastUpdate"), nil)
+	if err == nil {
+		var shieldingTxArrayObject *ShieldingTxArrayObject
+		json.Unmarshal(lastUpdateBytes, &shieldingTxArrayObject)
+		lastBTCHeightTracked = shieldingTxArrayObject.LastBTCHeightTracked
+		waitingShieldingList = shieldingTxArrayObject.WaitingShieldingList
+	}
 
 	// restore from db
 	lastBTCHeightTrackedBytes, err := b.db.Get([]byte("LastBTCHeightTracked"), nil)
@@ -67,6 +87,13 @@ func (b *BTCWalletMonitor) Execute() {
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve tx to multisig wallet - with err: %v", err))
 			continue
+		}
+
+		// check confirmed -> send rpc to notify the Inc chain
+		relayingBTCHeight, err := b.getLatestBTCBlockHashFromIncog()
+		if err != nil {
+			b.ExportErrorLog(fmt.Sprintf("Could not retrieve Inc relaying BTC block height - with err: %v", err))
+			return
 		}
 
 		for _, tx := range addrInfo.TXs {
@@ -104,25 +131,45 @@ func (b *BTCWalletMonitor) Execute() {
 				}
 
 				fmt.Printf("Found shielding request for address %v, with BTC tx %v\n", incAddress, tx.Hash)
+				waitingShieldingList[tx.Hash] = &ShieldingInfo{
+					IncAddress:     incAddress,
+					Proof:          proof,
+					BTCBlockHeight: uint64(tx.BlockHeight),
+				}
+			}
+		}
+
+		succeedShieldingRequest := make(chan string, len(waitingShieldingList))
+		for txHash, value := range waitingShieldingList {
+			if value.BTCBlockHeight+BTCConfirmationThreshold <= relayingBTCHeight {
 				// send RPC
-				txID, err := b.submitShieldingRequest(incAddress, proof)
+				txID, err := b.submitShieldingRequest(value.IncAddress, value.Proof)
 				if err != nil {
-					b.ExportErrorLog(fmt.Sprintf("Could not send shielding request from BTC tx %v proof with err: %v", tx.Hash, err))
+					b.ExportErrorLog(fmt.Sprintf("Could not send shielding request from BTC tx %v proof with err: %v", txHash, err))
 					continue
 				}
 				fmt.Printf("Shielding txID: %v\n", txID)
 				go func() {
 					err = b.getRequestShieldingStatus(txID)
 					if err != nil {
-						b.ExportErrorLog(fmt.Sprintf("Could not get request shielding status from BTC tx %v - with err: %v", tx.Hash, err))
-						return
+						b.ExportErrorLog(fmt.Sprintf("Could not get request shielding status from BTC tx %v - with err: %v", txHash, err))
+					} else {
+						succeedShieldingRequest <- txHash
 					}
 				}()
 			}
 		}
 
-		lastBTCHeightTrackedBytes, _ := json.Marshal(&lastBTCHeightTracked)
-		err = b.db.Put([]byte("LastBTCHeightTracked"), lastBTCHeightTrackedBytes, nil)
+		close(succeedShieldingRequest)
+		for txHash := range succeedShieldingRequest {
+			delete(waitingShieldingList, txHash)
+		}
+
+		shieldingTxArrayObjectBytes, _ := json.Marshal(&ShieldingTxArrayObject{
+			LastBTCHeightTracked: lastBTCHeightTracked,
+			WaitingShieldingList: waitingShieldingList,
+		})
+		err = b.db.Put([]byte("BTCMonitor-LastUpdate"), shieldingTxArrayObjectBytes, nil)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not save object to db - with err: %v", err))
 			return
