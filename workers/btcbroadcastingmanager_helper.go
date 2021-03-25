@@ -1,9 +1,7 @@
 package workers
 
 import (
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,8 +14,15 @@ import (
 	"github.com/incognitochain/portal-workers/utils"
 )
 
-func (b *BTCBroadcastingManager) isTimeoutBTCTx(broadcastBlockHeight uint64, curBlockHeight uint64) bool {
-	return curBlockHeight-broadcastBlockHeight >= TimeoutBTCFeeReplacement
+func (b *BTCBroadcastingManager) isTimeoutBTCTx(tx *BroadcastTx, curBlockHeight uint64) bool {
+	broadcastBlockHeight := tx.BlkHeight
+
+	if curBlockHeight-broadcastBlockHeight < TimeoutBTCFeeReplacement {
+		return false
+	}
+
+	bcyTx, err := b.bcy.GetTX(tx.TxHash, nil)
+	return err != nil || bcyTx.Confirmations <= 0 || bcyTx.BlockHeight <= 0
 }
 
 // return boolean value of transaction confirmation and bitcoin block height
@@ -123,17 +128,7 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchI
 			}
 
 			btcTxContent := signedRawTxRes.Result.SignedTx
-			data, err := hex.DecodeString(btcTxContent)
-			if err != nil {
-				b.Logger.Errorf("get tx hash error, %v\n", err)
-				return txArray, err
-			}
-			hash := sha256.Sum256(data)
-			hash = sha256.Sum256(hash[:])
-			for i, j := 0, len(hash)-1; i < j; i, j = i+1, j-1 {
-				hash[i], hash[j] = hash[j], hash[i]
-			}
-			btcTxHash := fmt.Sprintf("%x", hash[:])
+			btcTxHash := signedRawTxRes.Result.TxID
 
 			feePerRequest, numberRequest := b.getLatestBatchInfo(batch)
 			txArray[batch.BatchID] = &BroadcastTx{
@@ -165,18 +160,7 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 		}
 		if signedRawTxRes.RPCError == nil {
 			btcTxContent := signedRawTxRes.Result.SignedTx
-			data, err := hex.DecodeString(btcTxContent)
-			if err != nil {
-				b.Logger.Errorf("get tx hash error, %v\n", err)
-				return feeReplacementTxArray, txArray, err
-			}
-			hash := sha256.Sum256(data)
-			hash = sha256.Sum256(hash[:])
-			for i, j := 0, len(hash)-1; i < j; i, j = i+1, j-1 {
-				hash[i], hash[j] = hash[j], hash[i]
-			}
-			btcTxHash := fmt.Sprintf("%x", hash[:])
-			fmt.Printf("Replacement tx: %v\n", btcTxContent)
+			btcTxHash := signedRawTxRes.Result.TxID
 
 			txArray[batchID] = &BroadcastTx{
 				TxContent:     btcTxContent,

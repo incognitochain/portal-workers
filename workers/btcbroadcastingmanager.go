@@ -234,7 +234,7 @@ func (b *BTCBroadcastingManager) Execute() {
 			curBatchID := batchID
 			curTx := tx
 
-			if b.isTimeoutBTCTx(curTx.BlkHeight, curIncBlkHeight) { // waiting too long
+			if b.isTimeoutBTCTx(curTx, curIncBlkHeight) { // waiting too long
 				newFee, err := utils.GetNewFee(len(curTx.TxContent), curTx.FeePerRequest, curTx.NumOfRequests)
 				fmt.Printf("Old fee %v, request new fee %v for batchID %v\n", curTx.FeePerRequest, newFee, curBatchID)
 				if err != nil {
