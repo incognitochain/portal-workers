@@ -31,7 +31,7 @@ func (b *BTCBroadcastingManager) isConfirmedBTCTx(txHash string) (bool, uint64) 
 	if err != nil {
 		return false, 0
 	}
-	return tx.Confirmations >= ConfirmationThreshold, uint64(tx.BlockHeight)
+	return tx.Confirmations >= BTCConfirmationThreshold, uint64(tx.BlockHeight)
 }
 
 func (b *BTCBroadcastingManager) broadcastTx(txContent string) error {
