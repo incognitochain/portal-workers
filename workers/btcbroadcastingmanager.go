@@ -186,7 +186,7 @@ func (b *BTCBroadcastingManager) Execute() {
 
 			isConfirmed, btcBlockHeight := b.isConfirmedBTCTx(curTx.TxHash)
 
-			if isConfirmed && btcBlockHeight <= relayingBTCHeight {
+			if isConfirmed && btcBlockHeight+BTCConfirmationThreshold <= relayingBTCHeight {
 				// generate BTC proof
 				btcProof, err := b.buildProof(curTx.TxHash, btcBlockHeight)
 				fmt.Printf("%+v\n", btcProof)

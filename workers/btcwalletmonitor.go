@@ -62,7 +62,7 @@ func (b *BTCWalletMonitor) Execute() {
 		fmt.Printf("=== Scan tx from BTC block height: %v ===\n", lastBTCHeightTracked+1)
 		addrInfo, err := b.bcy.GetAddrFull(MultisigAddress, map[string]string{
 			"after":         strconv.FormatUint(lastBTCHeightTracked+1, 10),
-			"confirmations": strconv.FormatInt(int64(ConfirmationThreshold), 10),
+			"confirmations": strconv.FormatInt(int64(BTCConfirmationThreshold), 10),
 		})
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve tx to multisig wallet - with err: %v", err))
