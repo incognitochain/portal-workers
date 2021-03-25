@@ -11,21 +11,19 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/incognitochain/incognito-chain/wallet"
 	"github.com/incognitochain/portal-workers/entities"
 	"github.com/incognitochain/portal-workers/metadata"
 	"github.com/incognitochain/portal-workers/utils"
 )
 
 func (b *BTCBroadcastingManager) isTimeoutBTCTx(broadcastBlockHeight uint64, curBlockHeight uint64) bool {
-	return curBlockHeight-broadcastBlockHeight <= TimeoutBTCFeeReplacement
+	return curBlockHeight-broadcastBlockHeight >= TimeoutBTCFeeReplacement
 }
 
 // return boolean value of transaction confirmation and bitcoin block height
 func (b *BTCBroadcastingManager) isConfirmedBTCTx(txHash string) (bool, uint64) {
 	tx, err := b.bcy.GetTX(txHash, nil)
 	if err != nil {
-		b.ExportErrorLog(fmt.Sprintf("Could not check the confirmation of tx in BTC chain - with err: %v \n Tx hash: %v", err, txHash))
 		return false, 0
 	}
 	return tx.Confirmations >= ConfirmationThreshold, uint64(tx.BlockHeight)
@@ -115,12 +113,12 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchI
 				},
 			}
 			var signedRawTxRes entities.SignedRawTxRes
-			err := b.RPCClient.RPCCall("getporalsignedrawtransaction", params, &signedRawTxRes)
+			err := b.RPCClient.RPCCall("getportalsignedrawtransaction", params, &signedRawTxRes)
 			if err != nil {
 				return txArray, err
 			}
 			if signedRawTxRes.RPCError != nil {
-				b.Logger.Errorf("getporalsignedrawtransaction: call RPC error, %v\n", signedRawTxRes.RPCError.StackTrace)
+				b.Logger.Errorf("getportalsignedrawtransaction: call RPC error, %v\n", signedRawTxRes.RPCError.StackTrace)
 				return txArray, errors.New(signedRawTxRes.RPCError.Message)
 			}
 
@@ -178,6 +176,7 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 				hash[i], hash[j] = hash[j], hash[i]
 			}
 			btcTxHash := fmt.Sprintf("%x", hash[:])
+			fmt.Printf("Replacement tx: %v\n", btcTxContent)
 
 			txArray[batchID] = &BroadcastTx{
 				TxContent:     btcTxContent,
@@ -271,8 +270,7 @@ func (b *BTCBroadcastingManager) requestFeeReplacement(batchID string, newFee ui
 	if err != nil {
 		return "", err
 	}
-	paymentAddrStr := keyWallet.Base58CheckSerialize(wallet.PaymentAddressType)
-	meta, _ := metadata.NewPortalReplacementFeeRequest(PortalReplacementFeeRequestMeta, paymentAddrStr, BTCID, batchID, newFee)
+	meta, _ := metadata.NewPortalReplacementFeeRequest(PortalReplacementFeeRequestMeta, BTCID, batchID, newFee)
 	return sendTx(rpcClient, keyWallet, meta)
 }
 

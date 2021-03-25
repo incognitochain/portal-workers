@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/incognitochain/portal-workers/workers"
@@ -33,11 +31,11 @@ func NewServer() *Server {
 	}
 
 	listWorkers = append(listWorkers, btcBroadcastingManager)
-	listWorkers = append(listWorkers, btcWalletMonitorWorker)
+	// listWorkers = append(listWorkers, btcWalletMonitorWorker)
 
 	quitChan := make(chan os.Signal, 1)
-	signal.Notify(quitChan, syscall.SIGTERM)
-	signal.Notify(quitChan, syscall.SIGINT)
+	// signal.Notify(quitChan, syscall.SIGTERM)
+	// signal.Notify(quitChan, syscall.SIGINT)
 	return &Server{
 		quit:    quitChan,
 		finish:  make(chan bool, len(listWorkers)),

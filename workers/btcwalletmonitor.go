@@ -72,7 +72,7 @@ func (b *BTCWalletMonitor) Execute() {
 		for _, tx := range addrInfo.TXs {
 			time.Sleep(1 * time.Second)
 			// update last btc block height tracked
-			if uint64(tx.BlockHeight) > lastBTCHeightTracked {
+			if tx.BlockHeight > 0 && uint64(tx.BlockHeight) > lastBTCHeightTracked {
 				lastBTCHeightTracked = uint64(tx.BlockHeight)
 			}
 

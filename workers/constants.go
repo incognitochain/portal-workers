@@ -13,8 +13,8 @@ const (
 	INTERVAL_TRIES       = 1 * time.Minute
 
 	PortalShieldingRequestMeta      = 250
-	PortalReplacementFeeRequestMeta = 253
-	PortalSubmitConfirmedTxMeta     = 254
+	PortalReplacementFeeRequestMeta = 255
+	PortalSubmitConfirmedTxMeta     = 256
 
 	MultisigAddress = "2NGFTTKNj59NGmjQpajsEXGxwf9SP8gvJiv"
 )

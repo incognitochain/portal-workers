@@ -8,21 +8,19 @@ import (
 
 type PortalReplacementFeeRequest struct {
 	MetadataBase
-	IncAddressStr string
-	TokenID       string
-	BatchID       string
-	Fee           uint
+	TokenID string
+	BatchID string
+	Fee     uint
 }
 
-func NewPortalReplacementFeeRequest(metaType int, incAddressStr, tokenID, batchID string, fee uint) (*PortalReplacementFeeRequest, error) {
+func NewPortalReplacementFeeRequest(metaType int, tokenID, batchID string, fee uint) (*PortalReplacementFeeRequest, error) {
 	metadataBase := MetadataBase{
 		Type: metaType,
 	}
 	portalUnshieldReq := &PortalReplacementFeeRequest{
-		IncAddressStr: incAddressStr,
-		TokenID:       tokenID,
-		BatchID:       batchID,
-		Fee:           fee,
+		TokenID: tokenID,
+		BatchID: batchID,
+		Fee:     fee,
 	}
 	portalUnshieldReq.MetadataBase = metadataBase
 	return portalUnshieldReq, nil
@@ -30,7 +28,6 @@ func NewPortalReplacementFeeRequest(metaType int, incAddressStr, tokenID, batchI
 
 func (repl PortalReplacementFeeRequest) Hash() *common.Hash {
 	record := repl.MetadataBase.Hash().String()
-	record += repl.IncAddressStr
 	record += repl.TokenID
 	record += repl.BatchID
 	record += strconv.FormatUint(uint64(repl.Fee), 10)

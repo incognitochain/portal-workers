@@ -14,7 +14,7 @@ import (
 
 const InitIncBlockBatchSize = 1000
 const FirstBroadcastTxBlockHeight = 1
-const TimeoutBTCFeeReplacement = 1000
+const TimeoutBTCFeeReplacement = 50
 const ProcessedBlkCacheDepth = 10000
 
 type BTCBroadcastingManager struct {
@@ -135,13 +135,13 @@ func (b *BTCBroadcastingManager) Execute() {
 
 		// get list of processed batch IDs
 		processedBatchIDs := map[string]bool{}
-		for batchID, _ := range broadcastTxArray {
+		for batchID := range broadcastTxArray {
 			processedBatchIDs[batchID] = true
 		}
-		for batchID, _ := range feeReplacementTxArray {
+		for batchID := range feeReplacementTxArray {
 			processedBatchIDs[batchID] = true
 		}
-		for batchID, _ := range confirmedTxArray {
+		for batchID := range confirmedTxArray {
 			processedBatchIDs[batchID] = true
 		}
 
@@ -161,14 +161,14 @@ func (b *BTCBroadcastingManager) Execute() {
 		tempBroadcastTxArray := joinTxArray(tempBroadcastTxArray1, tempBroadcastTxArray2)
 
 		for batchID, tx := range tempBroadcastTxArray {
-			fmt.Printf("Got broadcast tx: %v %v\n", batchID, tx.TxContent)
+			fmt.Printf("Got broadcast tx for batch %v\n", batchID)
 			err := b.broadcastTx(tx.TxContent)
 			if err != nil {
-				b.ExportErrorLog(fmt.Sprintf("Could not broadcast txs - with err: %v", err))
+				b.ExportErrorLog(fmt.Sprintf("Could not broadcast tx %v - with err: %v", tx.TxHash, err))
 				continue
 			}
 		}
-		broadcastTxArray := joinTxArray(broadcastTxArray, tempBroadcastTxArray)
+		broadcastTxArray = joinTxArray(broadcastTxArray, tempBroadcastTxArray)
 
 		// check confirmed -> send rpc to notify the Inc chain
 		relayingBTCHeight, err := b.getLatestBTCBlockHashFromIncog()
@@ -236,7 +236,7 @@ func (b *BTCBroadcastingManager) Execute() {
 
 			if b.isTimeoutBTCTx(curTx.BlkHeight, curIncBlkHeight) { // waiting too long
 				newFee, err := utils.GetNewFee(len(curTx.TxContent), curTx.FeePerRequest, curTx.NumOfRequests)
-				fmt.Printf("Request new fee %v for batchID %v\n", newFee, curBatchID)
+				fmt.Printf("Old fee %v, request new fee %v for batchID %v\n", curTx.FeePerRequest, newFee, curBatchID)
 				if err != nil {
 					b.ExportErrorLog(fmt.Sprintf("Could not get new fee for batch %v - with err: %v", curBatchID, err))
 					continue
@@ -261,7 +261,7 @@ func (b *BTCBroadcastingManager) Execute() {
 							},
 						}
 					} else {
-						b.ExportErrorLog(fmt.Sprintf("Could not get request fee replacement tx status for batch %v - with err: %v", curBatchID, err))
+						b.ExportErrorLog(fmt.Sprintf("Could not get request fee replacement tx status for batch %v, txID %v - with err: %v", curBatchID, txID, err))
 						return
 					}
 				}()
