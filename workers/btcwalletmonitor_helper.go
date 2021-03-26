@@ -80,11 +80,11 @@ func (b *BTCWalletMonitor) getRequestShieldingStatus(txID string) error {
 
 	var err error
 	for idx := 0; idx < NUM_GET_STATUS_TRIES; idx++ {
+		time.Sleep(INTERVAL_TRIES)
 		err = b.RPCClient.RPCCall("getportalshieldingrequeststatus", params, &requestShieldingStatusRes)
 		if err == nil && requestShieldingStatusRes.RPCError == nil && requestShieldingStatusRes.Result.Status == 1 {
 			return nil
 		}
-		time.Sleep(INTERVAL_TRIES)
 	}
 
 	if err != nil {

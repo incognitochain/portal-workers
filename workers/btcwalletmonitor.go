@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/blockcypher/gobcy"
@@ -95,6 +96,7 @@ func (b *BTCWalletMonitor) Execute() {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve Inc relaying BTC block height - with err: %v", err))
 			return
 		}
+		fmt.Printf("Len of waiting shielding requests: %v\n", len(waitingShieldingList))
 
 		for _, tx := range addrInfo.TXs {
 			time.Sleep(1 * time.Second)
@@ -140,6 +142,7 @@ func (b *BTCWalletMonitor) Execute() {
 		}
 
 		succeedShieldingRequest := make(chan string, len(waitingShieldingList))
+		var wg sync.WaitGroup
 		for txHash, value := range waitingShieldingList {
 			if value.BTCBlockHeight+BTCConfirmationThreshold <= relayingBTCHeight {
 				// send RPC
@@ -149,7 +152,9 @@ func (b *BTCWalletMonitor) Execute() {
 					continue
 				}
 				fmt.Printf("Shielding txID: %v\n", txID)
+				wg.Add(1)
 				go func() {
+					defer wg.Done()
 					err = b.getRequestShieldingStatus(txID)
 					if err != nil {
 						b.ExportErrorLog(fmt.Sprintf("Could not get request shielding status from BTC tx %v - with err: %v", txHash, err))
@@ -159,6 +164,7 @@ func (b *BTCWalletMonitor) Execute() {
 				}()
 			}
 		}
+		wg.Wait()
 
 		close(succeedShieldingRequest)
 		for txHash := range succeedShieldingRequest {
