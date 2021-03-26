@@ -69,7 +69,7 @@ func (b *BTCWalletMonitor) submitShieldingRequest(incAddress string, proof strin
 	return sendTx(rpcClient, keyWallet, meta)
 }
 
-func (b *BTCWalletMonitor) getRequestShieldingStatus(txID string) error {
+func (b *BTCWalletMonitor) getRequestShieldingStatus(txID string) (int, error) {
 	params := []interface{}{
 		map[string]string{
 			"ReqTxID": txID,
@@ -83,18 +83,14 @@ func (b *BTCWalletMonitor) getRequestShieldingStatus(txID string) error {
 		time.Sleep(INTERVAL_TRIES)
 		err = b.RPCClient.RPCCall("getportalshieldingrequeststatus", params, &requestShieldingStatusRes)
 		if err == nil && requestShieldingStatusRes.RPCError == nil {
-			if requestShieldingStatusRes.Result.Status == 1 {
-				return nil
-			} else {
-				return fmt.Errorf("Request shielding failed")
-			}
+			return requestShieldingStatusRes.Result.Status, nil
 		}
 	}
 
 	if err != nil {
-		return err
+		return 0, err
 	} else {
-		return fmt.Errorf(requestShieldingStatusRes.RPCError.Message)
+		return 0, fmt.Errorf(requestShieldingStatusRes.RPCError.Message)
 	}
 }
 

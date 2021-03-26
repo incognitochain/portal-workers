@@ -141,10 +141,10 @@ func (b *BTCWalletMonitor) Execute() {
 			}
 		}
 
-		succeedShieldingRequest := make(chan string, len(waitingShieldingList))
+		sentShieldingRequest := make(chan string, len(waitingShieldingList))
 		var wg sync.WaitGroup
 		for txHash, value := range waitingShieldingList {
-			if value.BTCBlockHeight+BTCConfirmationThreshold <= relayingBTCHeight {
+			if value.BTCBlockHeight+BTCConfirmationThreshold <= relayingBTCHeight*100 {
 				// send RPC
 				txID, err := b.submitShieldingRequest(value.IncAddress, value.Proof)
 				if err != nil {
@@ -155,19 +155,22 @@ func (b *BTCWalletMonitor) Execute() {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					err = b.getRequestShieldingStatus(txID)
+					status, err := b.getRequestShieldingStatus(txID)
 					if err != nil {
 						b.ExportErrorLog(fmt.Sprintf("Could not get request shielding status from BTC tx %v - with err: %v", txHash, err))
 					} else {
-						succeedShieldingRequest <- txHash
+						if status == 0 { // rejected
+							b.ExportErrorLog(fmt.Sprintf("Request shielding failed BTC tx %v, shielding txID %v", txHash, txID))
+						}
+						sentShieldingRequest <- txHash
 					}
 				}()
 			}
 		}
 		wg.Wait()
 
-		close(succeedShieldingRequest)
-		for txHash := range succeedShieldingRequest {
+		close(sentShieldingRequest)
+		for txHash := range sentShieldingRequest {
 			delete(waitingShieldingList, txHash)
 		}
 
