@@ -233,19 +233,21 @@ func (b *BTCBroadcastingManager) getSubmitConfirmedTxStatus(txID string) error {
 
 	var err error
 	for idx := 0; idx < NUM_GET_STATUS_TRIES; idx++ {
-		err = b.RPCClient.RPCCall("getportalsubmitconfirmedtxstatus", params, &confirmedTxStatusRes)
-		if err == nil && confirmedTxStatusRes.RPCError == nil && confirmedTxStatusRes.Result.Status == 1 {
-			return nil
-		}
 		time.Sleep(INTERVAL_TRIES)
+		err = b.RPCClient.RPCCall("getportalsubmitconfirmedtxstatus", params, &confirmedTxStatusRes)
+		if err == nil && confirmedTxStatusRes.RPCError == nil {
+			if confirmedTxStatusRes.Result.Status == 1 {
+				return nil
+			} else {
+				return fmt.Errorf("Submit confirmed transaction failed")
+			}
+		}
 	}
 
 	if err != nil {
 		return err
-	} else if confirmedTxStatusRes.RPCError != nil {
-		return fmt.Errorf(confirmedTxStatusRes.RPCError.Message)
 	} else {
-		return fmt.Errorf("Submit confirmed transaction failed")
+		return fmt.Errorf(confirmedTxStatusRes.RPCError.Message)
 	}
 }
 
@@ -269,19 +271,21 @@ func (b *BTCBroadcastingManager) getRequestFeeReplacementTxStatus(txID string) e
 
 	var err error
 	for idx := 0; idx < NUM_GET_STATUS_TRIES; idx++ {
-		err = b.RPCClient.RPCCall("getportalreplacementfeestatus", params, &feeReplacementStatusRes)
-		if err == nil && feeReplacementStatusRes.RPCError == nil && feeReplacementStatusRes.Result.Status == 1 {
-			return nil
-		}
 		time.Sleep(INTERVAL_TRIES)
+		err = b.RPCClient.RPCCall("getportalreplacementfeestatus", params, &feeReplacementStatusRes)
+		if err == nil && feeReplacementStatusRes.RPCError == nil {
+			if feeReplacementStatusRes.Result.Status == 1 {
+				return nil
+			} else {
+				return fmt.Errorf("Request fee replacement failed")
+			}
+		}
 	}
 
 	if err != nil {
 		return err
-	} else if feeReplacementStatusRes.RPCError != nil {
-		return fmt.Errorf(feeReplacementStatusRes.RPCError.Message)
 	} else {
-		return fmt.Errorf("Request fee replacement failed")
+		return fmt.Errorf(feeReplacementStatusRes.RPCError.Message)
 	}
 }
 

@@ -82,17 +82,19 @@ func (b *BTCWalletMonitor) getRequestShieldingStatus(txID string) error {
 	for idx := 0; idx < NUM_GET_STATUS_TRIES; idx++ {
 		time.Sleep(INTERVAL_TRIES)
 		err = b.RPCClient.RPCCall("getportalshieldingrequeststatus", params, &requestShieldingStatusRes)
-		if err == nil && requestShieldingStatusRes.RPCError == nil && requestShieldingStatusRes.Result.Status == 1 {
-			return nil
+		if err == nil && requestShieldingStatusRes.RPCError == nil {
+			if requestShieldingStatusRes.Result.Status == 1 {
+				return nil
+			} else {
+				return fmt.Errorf("Request shielding failed")
+			}
 		}
 	}
 
 	if err != nil {
 		return err
-	} else if requestShieldingStatusRes.RPCError != nil {
-		return fmt.Errorf(requestShieldingStatusRes.RPCError.Message)
 	} else {
-		return fmt.Errorf("Request shielding failed")
+		return fmt.Errorf(requestShieldingStatusRes.RPCError.Message)
 	}
 }
 
