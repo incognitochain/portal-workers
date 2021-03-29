@@ -153,16 +153,17 @@ func (b *BTCWalletMonitor) Execute() {
 				}
 				fmt.Printf("Shielding txID: %v\n", txID)
 				wg.Add(1)
+				curTxHash := txHash
 				go func() {
 					defer wg.Done()
 					status, err := b.getRequestShieldingStatus(txID)
 					if err != nil {
-						b.ExportErrorLog(fmt.Sprintf("Could not get request shielding status from BTC tx %v - with err: %v", txHash, err))
+						b.ExportErrorLog(fmt.Sprintf("Could not get request shielding status from BTC tx %v - with err: %v", curTxHash, err))
 					} else {
 						if status == 0 { // rejected
 							b.ExportErrorLog(fmt.Sprintf("Request shielding failed BTC tx %v, shielding txID %v", txHash, txID))
 						}
-						sentShieldingRequest <- txHash
+						sentShieldingRequest <- curTxHash
 					}
 				}()
 			}
