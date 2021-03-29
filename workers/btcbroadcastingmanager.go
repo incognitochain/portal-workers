@@ -161,7 +161,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		tempBroadcastTxArray := joinTxArray(tempBroadcastTxArray1, tempBroadcastTxArray2)
 
 		for batchID, tx := range tempBroadcastTxArray {
-			fmt.Printf("Got broadcast tx for batch %v\n", batchID)
+			fmt.Printf("Broadcast tx for batch %v, content %v \n", batchID, tx.TxContent)
 			err := b.broadcastTx(tx.TxContent)
 			if err != nil {
 				b.ExportErrorLog(fmt.Sprintf("Could not broadcast tx %v - with err: %v", tx.TxHash, err))
