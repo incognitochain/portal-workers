@@ -14,22 +14,25 @@ import (
 
 const InitIncBlockBatchSize = 1000
 const FirstBroadcastTxBlockHeight = 1
-const TimeoutBTCFeeReplacement = 50
+const TimeoutBTCFeeReplacement = 100
+const TimeIntervalBTCFeeReplacement = 50
 const ProcessedBlkCacheDepth = 10000
 
 type BTCBroadcastingManager struct {
 	WorkerAbs
-	bcy      gobcy.API
-	bcyChain gobcy.Blockchain
-	db       *leveldb.DB
+	bcy        gobcy.API
+	bcyChain   gobcy.Blockchain
+	bitcoinFee uint
+	db         *leveldb.DB
 }
 
 type BroadcastTx struct {
-	TxContent     string
-	TxHash        string
-	FeePerRequest uint
-	NumOfRequests uint
-	BlkHeight     uint64 // height of the current Incog chain height when broadcasting tx
+	TxContent       string
+	TxHash          string
+	FeePerRequest   uint
+	NumOfRequests   uint
+	IsAcceptableFee bool
+	BlkHeight       uint64 // height of the current Incog chain height when broadcasting tx
 }
 
 type FeeReplacementTx struct {
@@ -95,6 +98,11 @@ func (b *BTCBroadcastingManager) Execute() {
 	}
 
 	for {
+		b.bitcoinFee, err = utils.GetCurrentRelayingFee()
+		if err != nil {
+			b.ExportErrorLog(fmt.Sprintf("Could not get bitcoin fee - with err: %v", err))
+			return
+		}
 		curIncBlkHeight, err := b.getLatestBeaconHeight()
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not get latest beacon height - with err: %v", err))
@@ -161,11 +169,15 @@ func (b *BTCBroadcastingManager) Execute() {
 		tempBroadcastTxArray := joinTxArray(tempBroadcastTxArray1, tempBroadcastTxArray2)
 
 		for batchID, tx := range tempBroadcastTxArray {
-			fmt.Printf("Broadcast tx for batch %v, content %v \n", batchID, tx.TxContent)
-			err := b.broadcastTx(tx.TxContent)
-			if err != nil {
-				b.ExportErrorLog(fmt.Sprintf("Could not broadcast tx %v - with err: %v", tx.TxHash, err))
-				continue
+			if tx.IsAcceptableFee {
+				fmt.Printf("Broadcast tx for batch %v, content %v \n", batchID, tx.TxContent)
+				err := b.broadcastTx(tx.TxContent)
+				if err != nil {
+					b.ExportErrorLog(fmt.Sprintf("Could not broadcast tx %v - with err: %v", tx.TxHash, err))
+					continue
+				}
+			} else {
+				fmt.Printf("Does not broadcast tx for batch %v has fee %v is not enough\n", batchID, tx.FeePerRequest)
 			}
 		}
 		broadcastTxArray = joinTxArray(broadcastTxArray, tempBroadcastTxArray)
@@ -181,41 +193,43 @@ func (b *BTCBroadcastingManager) Execute() {
 
 		confirmedBatchIDChan := make(chan map[string]*ConfirmedTx, len(broadcastTxArray))
 		for batchID, tx := range broadcastTxArray {
-			curBatchID := batchID
-			curTx := tx
+			if tx.IsAcceptableFee {
+				curBatchID := batchID
+				curTx := tx
 
-			isConfirmed, btcBlockHeight := b.isConfirmedBTCTx(curTx.TxHash)
+				isConfirmed, btcBlockHeight := b.isConfirmedBTCTx(curTx.TxHash)
 
-			if isConfirmed && btcBlockHeight+BTCConfirmationThreshold <= relayingBTCHeight {
-				// generate BTC proof
-				btcProof, err := b.buildProof(curTx.TxHash, btcBlockHeight)
-				fmt.Printf("%+v\n", btcProof)
-				if err != nil {
-					b.ExportErrorLog(fmt.Sprintf("Could not generate BTC proof for batch %v - with err: %v", curBatchID, err))
-					continue
-				}
-
-				// submit confirmed tx
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					txID, err := b.submitConfirmedTx(btcProof, curBatchID)
+				if isConfirmed && btcBlockHeight+BTCConfirmationThreshold <= relayingBTCHeight {
+					// generate BTC proof
+					btcProof, err := b.buildProof(curTx.TxHash, btcBlockHeight)
+					fmt.Printf("%+v\n", btcProof)
 					if err != nil {
-						b.ExportErrorLog(fmt.Sprintf("Could not submit confirmed tx for batch %v - with err: %v", curBatchID, err))
-						return
+						b.ExportErrorLog(fmt.Sprintf("Could not generate BTC proof for batch %v - with err: %v", curBatchID, err))
+						continue
 					}
-					err = b.getSubmitConfirmedTxStatus(txID)
-					if err == nil {
-						confirmedBatchIDChan <- map[string]*ConfirmedTx{
-							curBatchID: {
-								BlkHeight: curIncBlkHeight,
-							},
+
+					// submit confirmed tx
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						txID, err := b.submitConfirmedTx(btcProof, curBatchID)
+						if err != nil {
+							b.ExportErrorLog(fmt.Sprintf("Could not submit confirmed tx for batch %v - with err: %v", curBatchID, err))
+							return
 						}
-					} else {
-						b.ExportErrorLog(fmt.Sprintf("Could not get submit confirmed tx status for batch %v - with err: %v", curBatchID, err))
-						return
-					}
-				}()
+						err = b.getSubmitConfirmedTxStatus(txID)
+						if err == nil {
+							confirmedBatchIDChan <- map[string]*ConfirmedTx{
+								curBatchID: {
+									BlkHeight: curIncBlkHeight,
+								},
+							}
+						} else {
+							b.ExportErrorLog(fmt.Sprintf("Could not get submit confirmed tx status for batch %v - with err: %v", curBatchID, err))
+							return
+						}
+					}()
+				}
 			}
 		}
 		wg.Wait()
@@ -235,12 +249,8 @@ func (b *BTCBroadcastingManager) Execute() {
 			curTx := tx
 
 			if b.isTimeoutBTCTx(curTx, curIncBlkHeight) { // waiting too long
-				newFee, err := utils.GetNewFee(len(curTx.TxContent), curTx.FeePerRequest, curTx.NumOfRequests)
+				newFee := utils.GetNewFee(len(curTx.TxContent), curTx.FeePerRequest, curTx.NumOfRequests, b.bitcoinFee)
 				fmt.Printf("Old fee %v, request new fee %v for batchID %v\n", curTx.FeePerRequest, newFee, curBatchID)
-				if err != nil {
-					b.ExportErrorLog(fmt.Sprintf("Could not get new fee for batch %v - with err: %v", curBatchID, err))
-					continue
-				}
 				// notify the Inc chain for fee replacement
 				wg.Add(1)
 				go func() {

@@ -17,12 +17,16 @@ import (
 func (b *BTCBroadcastingManager) isTimeoutBTCTx(tx *BroadcastTx, curBlockHeight uint64) bool {
 	broadcastBlockHeight := tx.BlkHeight
 
-	if curBlockHeight-broadcastBlockHeight < TimeoutBTCFeeReplacement {
-		return false
-	}
+	if tx.IsAcceptableFee {
+		return curBlockHeight-broadcastBlockHeight >= TimeIntervalBTCFeeReplacement
+	} else {
+		if curBlockHeight-broadcastBlockHeight < TimeoutBTCFeeReplacement {
+			return false
+		}
 
-	bcyTx, err := b.bcy.GetTX(tx.TxHash, nil)
-	return err != nil || bcyTx.Confirmations <= 0 || bcyTx.BlockHeight <= 0
+		bcyTx, err := b.bcy.GetTX(tx.TxHash, nil)
+		return err != nil || bcyTx.Confirmations <= 0 || bcyTx.BlockHeight <= 0
+	}
 }
 
 // return boolean value of transaction confirmation and bitcoin block height
@@ -131,12 +135,14 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchI
 			btcTxHash := signedRawTxRes.Result.TxID
 
 			feePerRequest, numberRequest := b.getLatestBatchInfo(batch)
+			acceptableFee := utils.IsEnoughFee(len(btcTxContent), feePerRequest, numberRequest, b.bitcoinFee)
 			txArray[batch.BatchID] = &BroadcastTx{
-				TxContent:     btcTxContent,
-				TxHash:        btcTxHash,
-				FeePerRequest: feePerRequest,
-				NumOfRequests: numberRequest,
-				BlkHeight:     curIncBlkHeight,
+				TxContent:       btcTxContent,
+				TxHash:          btcTxHash,
+				FeePerRequest:   feePerRequest,
+				NumOfRequests:   numberRequest,
+				IsAcceptableFee: acceptableFee,
+				BlkHeight:       curIncBlkHeight,
 			}
 		}
 	}
@@ -161,13 +167,15 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 		if signedRawTxRes.RPCError == nil {
 			btcTxContent := signedRawTxRes.Result.SignedTx
 			btcTxHash := signedRawTxRes.Result.TxID
+			acceptableFee := utils.IsEnoughFee(len(btcTxContent), tx.FeePerRequest, tx.NumOfRequests, b.bitcoinFee)
 
 			txArray[batchID] = &BroadcastTx{
-				TxContent:     btcTxContent,
-				TxHash:        btcTxHash,
-				FeePerRequest: tx.FeePerRequest,
-				NumOfRequests: tx.NumOfRequests,
-				BlkHeight:     curIncBlkHeight,
+				TxContent:       btcTxContent,
+				TxHash:          btcTxHash,
+				FeePerRequest:   tx.FeePerRequest,
+				NumOfRequests:   tx.NumOfRequests,
+				IsAcceptableFee: acceptableFee,
+				BlkHeight:       curIncBlkHeight,
 			}
 
 			delete(feeReplacementTxArray, batchID)
