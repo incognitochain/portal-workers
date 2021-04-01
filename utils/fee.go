@@ -7,18 +7,18 @@ import (
 )
 
 const (
-	MAX_RATE_INCREASING_STEP     = 1.2
+	OVERPAYING_RATE              = 1.1
 	DEFAULT_RATE_INCREASING_STEP = 1.15
 )
 
 type FeeAPIResponseBody struct {
-	FastestFee  uint64 `json:"fastestFee"`
-	HalfHourFee uint64 `json:"halfHourFee"`
-	HourFee     uint64 `json:"hourFee"`
+	FastestFee  uint `json:"fastestFee"`
+	HalfHourFee uint `json:"halfHourFee"`
+	HourFee     uint `json:"hourFee"`
 }
 
-func GetNewFee(txSize int, oldFeePerUnshieldRequest uint, numberOfUnshieldRequest uint) (uint, error) { // pToken
-	oldFee := uint64(oldFeePerUnshieldRequest) * uint64(numberOfUnshieldRequest) / 10 // oldFee: satoshi, oldFeePerUnshieldRequest: nano pBTC
+// Get fee in the current bitcoin condition (satoshi / kb)
+func GetCurrentRelayingFee() (uint, error) {
 	response, err := http.Get("https://bitcoinfees.earn.com/api/v1/fees/recommended")
 	if err != nil {
 		return 0, err
@@ -27,22 +27,30 @@ func GetNewFee(txSize int, oldFeePerUnshieldRequest uint, numberOfUnshieldReques
 	if err != nil {
 		return 0, err
 	}
-
 	var responseBody FeeAPIResponseBody
 	err = json.Unmarshal(responseData, &responseBody)
 	if err != nil {
 		return 0, err
 	}
 
-	newFee := uint64(float64(responseBody.HalfHourFee) * float64(txSize) * 1.2)
-	if newFee < oldFee {
-		newFee = uint64(float64(responseBody.FastestFee) * float64(txSize) * 1.2)
-	}
-	if newFee < oldFee || newFee > uint64(float64(oldFee)*MAX_RATE_INCREASING_STEP) {
+	return responseBody.FastestFee, nil
+}
+
+// Get new fee per request (nano pToken)
+func GetNewFee(txSize int, oldFeePerUnshieldRequest uint, numberOfUnshieldRequest uint, currentRelayingFee uint) uint { // pToken
+	oldFee := uint64(oldFeePerUnshieldRequest) * uint64(numberOfUnshieldRequest) / 10 // oldFee: satoshi, oldFeePerUnshieldRequest: nano pBTC
+	newFee := uint64(float64(currentRelayingFee) * float64(txSize) * OVERPAYING_RATE)
+
+	if newFee < oldFee || newFee > uint64(float64(oldFee)*DEFAULT_RATE_INCREASING_STEP) {
 		newFee = uint64(float64(oldFee) * DEFAULT_RATE_INCREASING_STEP)
 	}
-
 	newFeePerUnshieldRequest := uint((newFee-1)/uint64(numberOfUnshieldRequest)+1) * 10 // newFeePerUnshieldRequest: nano pBTC
 
-	return newFeePerUnshieldRequest, nil
+	return newFeePerUnshieldRequest
+}
+
+func IsEnoughFee(txSize int, feePerRequest uint, numberOfRequest uint, currentRelayingFee uint) bool {
+	fee := uint64(feePerRequest) * uint64(numberOfRequest) / 10 // fee: satoshi, feePerRequest: nano pToken
+	expectedFee := uint64(float64(currentRelayingFee) * float64(txSize) * OVERPAYING_RATE)
+	return fee >= expectedFee
 }
