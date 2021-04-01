@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/0xkraken/incognito-sdk-golang/wallet"
 	"github.com/blockcypher/gobcy"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/incognitochain/portal-workers/entities"
@@ -94,31 +93,6 @@ func (b *BTCWalletMonitor) getRequestShieldingStatus(txID string) (int, error) {
 	}
 }
 
-func (b *BTCWalletMonitor) extractMemo(memo string) (string, error) {
-	if len(memo) <= 4 {
-		return "", fmt.Errorf("The memo is too short")
-	}
-	if memo[:4] != "PS1-" {
-		return "", fmt.Errorf("Memo prefix is not match")
-	}
-
-	// privacy v1
-	incAddress := memo[4:]
-	// validate IncogAddressStr
-	keyWallet, err := wallet.Base58CheckDeserialize(incAddress)
-	if err != nil {
-		return "", fmt.Errorf("Incognito address is invalid")
-	}
-	incogAddr := keyWallet.KeySet.PaymentAddress
-	if len(incogAddr.Pk) == 0 {
-		return "", fmt.Errorf("Incognito address is invalid")
-	}
-
-	return incAddress, nil
-
-	// privacy v2
-}
-
 func (b *BTCWalletMonitor) getLatestBTCBlockHashFromIncog() (uint64, error) {
 	params := []interface{}{}
 	var btcRelayingBestStateRes entities.BTCRelayingBestStateRes
@@ -138,4 +112,8 @@ func (b *BTCWalletMonitor) getLatestBTCBlockHashFromIncog() (uint64, error) {
 	}
 	currentBTCBlkHeight := btcBestState.Height
 	return uint64(currentBTCBlkHeight), nil
+}
+
+func (b *BTCWalletMonitor) getTrackingInstance(from int64, to int64) ([]*ShieldingMonitoringInfo, error) {
+	return []*ShieldingMonitoringInfo{}, nil
 }
