@@ -230,7 +230,7 @@ func (b *BTCBroadcastingManager) submitConfirmedTx(proof string, batchID string)
 	return sendTx(rpcClient, keyWallet, meta)
 }
 
-func (b *BTCBroadcastingManager) getSubmitConfirmedTxStatus(txID string) error {
+func (b *BTCBroadcastingManager) getSubmitConfirmedTxStatus(txID string) (int, error) {
 	params := []interface{}{
 		map[string]string{
 			"ReqTxID": txID,
@@ -244,18 +244,14 @@ func (b *BTCBroadcastingManager) getSubmitConfirmedTxStatus(txID string) error {
 		time.Sleep(INTERVAL_TRIES)
 		err = b.RPCClient.RPCCall("getportalsubmitconfirmedtxstatus", params, &confirmedTxStatusRes)
 		if err == nil && confirmedTxStatusRes.RPCError == nil {
-			if confirmedTxStatusRes.Result.Status == 1 {
-				return nil
-			} else {
-				return fmt.Errorf("Submit confirmed transaction failed")
-			}
+			return confirmedTxStatusRes.Result.Status, nil
 		}
 	}
 
 	if err != nil {
-		return err
+		return 0, err
 	} else {
-		return fmt.Errorf(confirmedTxStatusRes.RPCError.Message)
+		return 0, fmt.Errorf(confirmedTxStatusRes.RPCError.Message)
 	}
 }
 
@@ -268,7 +264,7 @@ func (b *BTCBroadcastingManager) requestFeeReplacement(batchID string, newFee ui
 	return sendTx(rpcClient, keyWallet, meta)
 }
 
-func (b *BTCBroadcastingManager) getRequestFeeReplacementTxStatus(txID string) error {
+func (b *BTCBroadcastingManager) getRequestFeeReplacementTxStatus(txID string) (int, error) {
 	params := []interface{}{
 		map[string]string{
 			"ReqTxID": txID,
@@ -282,18 +278,14 @@ func (b *BTCBroadcastingManager) getRequestFeeReplacementTxStatus(txID string) e
 		time.Sleep(INTERVAL_TRIES)
 		err = b.RPCClient.RPCCall("getportalreplacementfeestatus", params, &feeReplacementStatusRes)
 		if err == nil && feeReplacementStatusRes.RPCError == nil {
-			if feeReplacementStatusRes.Result.Status == 1 {
-				return nil
-			} else {
-				return fmt.Errorf("Request fee replacement failed")
-			}
+			return feeReplacementStatusRes.Result.Status, nil
 		}
 	}
 
 	if err != nil {
-		return err
+		return 0, err
 	} else {
-		return fmt.Errorf(feeReplacementStatusRes.RPCError.Message)
+		return 0, fmt.Errorf(feeReplacementStatusRes.RPCError.Message)
 	}
 }
 

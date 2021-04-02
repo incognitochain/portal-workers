@@ -77,6 +77,10 @@ func (b *BTCBroadcastingManager) ExportErrorLog(msg string) {
 	b.WorkerAbs.ExportErrorLog(msg)
 }
 
+func (b *BTCBroadcastingManager) ExportInfoLog(msg string) {
+	b.WorkerAbs.ExportInfoLog(msg)
+}
+
 func (b *BTCBroadcastingManager) Execute() {
 	b.Logger.Info("BTCBroadcastingManager worker is executing...")
 	defer b.db.Close()
@@ -217,16 +221,20 @@ func (b *BTCBroadcastingManager) Execute() {
 							b.ExportErrorLog(fmt.Sprintf("Could not submit confirmed tx for batch %v - with err: %v", curBatchID, err))
 							return
 						}
-						err = b.getSubmitConfirmedTxStatus(txID)
-						if err == nil {
+						status, err := b.getSubmitConfirmedTxStatus(txID)
+						if err != nil {
+							b.ExportErrorLog(fmt.Sprintf("Could not get submit confirmed tx status for batch %v, txID %v - with err: %v", curBatchID, txID, err))
+						} else {
+							if status == 0 { // rejected
+								b.ExportErrorLog(fmt.Sprintf("Send confirmation failed for batch %v, txID %v - with err: %v", curBatchID, txID, err))
+							} else {
+								b.ExportInfoLog(fmt.Sprintf("Send confirmation succeed for batch %v, txID %v", curBatchID, txID))
+							}
 							confirmedBatchIDChan <- map[string]*ConfirmedTx{
 								curBatchID: {
 									BlkHeight: curIncBlkHeight,
 								},
 							}
-						} else {
-							b.ExportErrorLog(fmt.Sprintf("Could not get submit confirmed tx status for batch %v - with err: %v", curBatchID, err))
-							return
 						}
 					}()
 				}
@@ -257,11 +265,18 @@ func (b *BTCBroadcastingManager) Execute() {
 					defer wg.Done()
 					txID, err := b.requestFeeReplacement(curBatchID, newFee)
 					if err != nil {
-						b.ExportErrorLog(fmt.Sprintf("Could not request fee replacement for batch %v - with err: %v", curBatchID, err))
+						b.ExportErrorLog(fmt.Sprintf("Could not request RBF for batch %v - with err: %v", curBatchID, err))
 						return
 					}
-					err = b.getRequestFeeReplacementTxStatus(txID)
-					if err == nil {
+					status, err := b.getRequestFeeReplacementTxStatus(txID)
+					if err != nil {
+						b.ExportErrorLog(fmt.Sprintf("Could not request RBF tx status for batch %v, txID %v - with err: %v", curBatchID, txID, err))
+					} else {
+						if status == 0 { // rejected
+							b.ExportErrorLog(fmt.Sprintf("Send RBF request failed for batch %v, txID %v - with err: %v", curBatchID, txID, err))
+						} else {
+							b.ExportInfoLog(fmt.Sprintf("Send RBF request succeed for batch %v, txID: %v", curBatchID, txID))
+						}
 						replacedBatchIDChan <- map[string]*FeeReplacementTx{
 							batchID: {
 								ReqTxID:       txID,
@@ -270,9 +285,6 @@ func (b *BTCBroadcastingManager) Execute() {
 								BlkHeight:     curIncBlkHeight,
 							},
 						}
-					} else {
-						b.ExportErrorLog(fmt.Sprintf("Could not get request fee replacement tx status for batch %v, txID %v - with err: %v", curBatchID, txID, err))
-						return
 					}
 				}()
 			}
