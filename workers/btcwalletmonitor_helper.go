@@ -14,9 +14,9 @@ import (
 	"github.com/incognitochain/portal-workers/utils"
 )
 
-func (b *BTCWalletMonitor) isReceivingTx(tx *gobcy.TX) bool {
+func (b *BTCWalletMonitor) isReceivingTx(tx *gobcy.TX, btcAddresss string) bool {
 	for _, input := range tx.Inputs {
-		if input.Addresses[0] == MultisigAddress {
+		if input.Addresses[0] == btcAddresss {
 			return false
 		}
 	}

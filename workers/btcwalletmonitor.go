@@ -90,6 +90,7 @@ func (b *BTCWalletMonitor) Execute() {
 			b.ExportErrorLog(fmt.Sprintf("Could not get tracking instance from API - with err: %v", err))
 			return
 		}
+		lastTimeUpdated = currentTimeStamp
 		shieldingMonitoringList = append(shieldingMonitoringList, newlyTrackingInstance...)
 
 		// delete timeout tracking instance
@@ -127,7 +128,7 @@ func (b *BTCWalletMonitor) Execute() {
 					lastBTCHeightTracked = uint64(tx.BlockHeight)
 				}
 
-				if b.isReceivingTx(&tx) {
+				if b.isReceivingTx(&tx, btcAddress) {
 					// generate proof
 					proof, err := b.buildProof(tx.Hash, uint64(tx.BlockHeight))
 					if err != nil {
