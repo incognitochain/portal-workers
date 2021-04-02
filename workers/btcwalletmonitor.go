@@ -82,6 +82,13 @@ func (b *BTCWalletMonitor) Execute() {
 		lastTimeUpdated = shieldingTxArrayObject.LastTimeStampUpdated
 	}
 
+	// shieldingMonitoringList = append(shieldingMonitoringList, &ShieldingMonitoringInfo{
+	// 	IncAddress:         "12S5Lrs1XeQLbqN4ySyKtjAjd2d7sBP2tjFijzmp6avrrkQCNFMpkXm3FPzj2Wcu2ZNqJEmh9JriVuRErVwhuQnLmWSaggobEWsBEci",
+	// 	BTCAddress:         "tb1qxds4waaq7zll6w699sfarajvm3c5m98qpttkcvcgesxwk0989pks42hktr",
+	// 	TimeStamp:          time.Now().Unix(),
+	// 	LastBTCHeightTrack: 0,
+	// })
+
 	for {
 		// get new rescanning instance from API
 		currentTimeStamp := time.Now().Unix()
@@ -105,6 +112,7 @@ func (b *BTCWalletMonitor) Execute() {
 				idx++
 			}
 		}
+		shieldingMonitoringList = shieldingMonitoringList[:lenArr]
 
 		// track transactions send to bitcoin addresses
 		for _, trackingInstance := range shieldingMonitoringList {
@@ -155,7 +163,8 @@ func (b *BTCWalletMonitor) Execute() {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve Inc relaying BTC block height - with err: %v", err))
 			return
 		}
-		fmt.Printf("Len of waiting shielding requests: %v\n", len(waitingShieldingList))
+		fmt.Printf("Number of waiting shielding requests: %v\n", len(waitingShieldingList))
+		fmt.Printf("Number of shielding monitoring instances: %v\n", len(shieldingMonitoringList))
 
 		sentShieldingRequest := make(chan string, len(waitingShieldingList))
 		var wg sync.WaitGroup
@@ -177,7 +186,7 @@ func (b *BTCWalletMonitor) Execute() {
 						b.ExportErrorLog(fmt.Sprintf("Could not get request shielding status from BTC tx %v - with err: %v", curTxHash, err))
 					} else {
 						if status == 0 { // rejected
-							b.ExportErrorLog(fmt.Sprintf("Request shielding failed BTC tx %v, shielding txID %v", txHash, txID))
+							b.ExportErrorLog(fmt.Sprintf("Request shielding failed BTC tx %v, shielding txID %v", curTxHash, txID))
 						}
 						sentShieldingRequest <- curTxHash
 					}
