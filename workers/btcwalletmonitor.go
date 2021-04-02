@@ -64,6 +64,10 @@ func (b *BTCWalletMonitor) ExportErrorLog(msg string) {
 	b.WorkerAbs.ExportErrorLog(msg)
 }
 
+func (b *BTCWalletMonitor) ExportInfoLog(msg string) {
+	b.WorkerAbs.ExportInfoLog(msg)
+}
+
 func (b *BTCWalletMonitor) Execute() {
 	b.Logger.Info("BTCWalletMonitor worker is executing...")
 	defer b.db.Close()
@@ -187,6 +191,8 @@ func (b *BTCWalletMonitor) Execute() {
 					} else {
 						if status == 0 { // rejected
 							b.ExportErrorLog(fmt.Sprintf("Request shielding failed BTC tx %v, shielding txID %v", curTxHash, txID))
+						} else {
+							b.ExportInfoLog(fmt.Sprintf("Request shielding succeed BTC tx %v, shielding txID %v", curTxHash, txID))
 						}
 						sentShieldingRequest <- curTxHash
 					}
