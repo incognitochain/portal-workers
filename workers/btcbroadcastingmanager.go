@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/blockcypher/gobcy"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/incognitochain/portal-workers/utils"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -22,6 +23,7 @@ type BTCBroadcastingManager struct {
 	WorkerAbs
 	bcy        gobcy.API
 	bcyChain   gobcy.Blockchain
+	btcClient  *rpcclient.Client
 	bitcoinFee uint
 	db         *leveldb.DB
 }
@@ -69,6 +71,13 @@ func (b *BTCBroadcastingManager) Init(id int, name string, freq int, network str
 	b.db, err = leveldb.OpenFile("db/broadcastingmanager", nil)
 	if err != nil {
 		b.ExportErrorLog(fmt.Sprintf("Could not open leveldb storage file - with err: %v", err))
+		return err
+	}
+
+	// init bitcoin rpcclient
+	b.btcClient, err = utils.BuildBTCClient()
+	if err != nil {
+		b.ExportErrorLog(fmt.Sprintf("Could not initialize Bitcoin RPCClient - with err: %v", err))
 		return err
 	}
 

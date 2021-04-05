@@ -1,7 +1,9 @@
 package workers
 
 import (
+	"bytes"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +11,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/incognitochain/portal-workers/entities"
 	"github.com/incognitochain/portal-workers/metadata"
 	"github.com/incognitochain/portal-workers/utils"
@@ -39,7 +42,21 @@ func (b *BTCBroadcastingManager) isConfirmedBTCTx(txHash string) (bool, uint64) 
 }
 
 func (b *BTCBroadcastingManager) broadcastTx(txContent string) error {
-	_, err := b.bcy.PushTX(txContent)
+	// Decode the serialized transaction hex to raw bytes.
+	serializedTx, err := hex.DecodeString(txContent)
+	if err != nil {
+		b.ExportErrorLog(fmt.Sprintf("Could not serialized tx content %v - with err: %v \n", txContent, err))
+		return err
+	}
+
+	msgTx := &wire.MsgTx{}
+	err = msgTx.Deserialize(bytes.NewReader(serializedTx))
+	if err != nil {
+		b.ExportErrorLog(fmt.Sprintf("Could not deserialize tx content %v to MsgTx - with err: %v \n", txContent, err))
+		return err
+	}
+
+	_, err = b.btcClient.SendRawTransaction(msgTx, true)
 	if err != nil {
 		b.ExportErrorLog(fmt.Sprintf("Could not broadcast tx content %v to BTC chain - with err: %v \n", txContent, err))
 		return err
