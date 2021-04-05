@@ -17,7 +17,7 @@ import (
 func (b *BTCBroadcastingManager) isTimeoutBTCTx(tx *BroadcastTx, curBlockHeight uint64) bool {
 	broadcastBlockHeight := tx.BlkHeight
 
-	if tx.IsAcceptableFee {
+	if tx.IsBroadcasted {
 		return curBlockHeight-broadcastBlockHeight >= TimeIntervalBTCFeeReplacement
 	} else {
 		if curBlockHeight-broadcastBlockHeight < TimeoutBTCFeeReplacement {
@@ -127,22 +127,24 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchI
 				return txArray, err
 			}
 			if signedRawTxRes.RPCError != nil {
-				b.Logger.Errorf("getportalsignedrawtransaction: call RPC error, %v\n", signedRawTxRes.RPCError.StackTrace)
-				return txArray, errors.New(signedRawTxRes.RPCError.Message)
+				b.Logger.Errorf("getportalsignedrawtransaction: call RPC for batchID %v - with err %v\n", batch.BatchID, signedRawTxRes.RPCError.StackTrace)
+				continue
 			}
 
 			btcTxContent := signedRawTxRes.Result.SignedTx
 			btcTxHash := signedRawTxRes.Result.TxID
+			btcTxSize := len(btcTxContent)
 
 			feePerRequest, numberRequest := b.getLatestBatchInfo(batch)
-			acceptableFee := utils.IsEnoughFee(len(btcTxContent), feePerRequest, numberRequest, b.bitcoinFee)
+			acceptableFee := utils.IsEnoughFee(btcTxSize, feePerRequest, numberRequest, b.bitcoinFee)
 			txArray[batch.BatchID] = &BroadcastTx{
-				TxContent:       btcTxContent,
-				TxHash:          btcTxHash,
-				FeePerRequest:   feePerRequest,
-				NumOfRequests:   numberRequest,
-				IsAcceptableFee: acceptableFee,
-				BlkHeight:       curIncBlkHeight,
+				TxContent:     btcTxContent,
+				TxHash:        btcTxHash,
+				TxSize:        btcTxSize,
+				FeePerRequest: feePerRequest,
+				NumOfRequests: numberRequest,
+				IsBroadcasted: acceptableFee,
+				BlkHeight:     curIncBlkHeight,
 			}
 		}
 	}
@@ -154,32 +156,48 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 	txArray := map[string]*BroadcastTx{}
 
 	for batchID, tx := range feeReplacementTxArray {
-		params = []interface{}{
-			map[string]string{
-				"TxID": tx.ReqTxID,
-			},
-		}
-		var signedRawTxRes entities.SignedRawTxRes
-		err := b.RPCClient.RPCCall("getporalsignedrawreplacefeetransaction", params, &signedRawTxRes)
-		if err != nil {
-			return feeReplacementTxArray, txArray, err
-		}
-		if signedRawTxRes.RPCError == nil {
-			btcTxContent := signedRawTxRes.Result.SignedTx
-			btcTxHash := signedRawTxRes.Result.TxID
-			acceptableFee := utils.IsEnoughFee(len(btcTxContent), tx.FeePerRequest, tx.NumOfRequests, b.bitcoinFee)
-
-			txArray[batchID] = &BroadcastTx{
-				TxContent:       btcTxContent,
-				TxHash:          btcTxHash,
-				FeePerRequest:   tx.FeePerRequest,
-				NumOfRequests:   tx.NumOfRequests,
-				IsAcceptableFee: acceptableFee,
-				BlkHeight:       curIncBlkHeight,
+		acceptableFee := utils.IsEnoughFee(tx.TxSize, tx.FeePerRequest, tx.NumOfRequests, b.bitcoinFee)
+		if acceptableFee && tx.ReqTxID != "" {
+			params = []interface{}{
+				map[string]string{
+					"TxID": tx.ReqTxID,
+				},
+			}
+			var signedRawTxRes entities.SignedRawTxRes
+			err := b.RPCClient.RPCCall("getporalsignedrawreplacefeetransaction", params, &signedRawTxRes)
+			if err != nil {
+				return feeReplacementTxArray, txArray, err
+			}
+			if signedRawTxRes.RPCError != nil {
+				b.Logger.Errorf("getporalsignedrawreplacefeetransaction: call RPC for ReqTxID %v - with err %v\n", tx.ReqTxID, signedRawTxRes.RPCError.StackTrace)
+				continue
 			}
 
-			delete(feeReplacementTxArray, batchID)
+			btcTxContent := signedRawTxRes.Result.SignedTx
+			btcTxHash := signedRawTxRes.Result.TxID
+
+			txArray[batchID] = &BroadcastTx{
+				TxContent:     btcTxContent,
+				TxHash:        btcTxHash,
+				TxSize:        tx.TxSize,
+				FeePerRequest: tx.FeePerRequest,
+				NumOfRequests: tx.NumOfRequests,
+				IsBroadcasted: true,
+				BlkHeight:     curIncBlkHeight,
+			}
+		} else {
+			txArray[batchID] = &BroadcastTx{
+				TxContent:     "",
+				TxHash:        "",
+				TxSize:        tx.TxSize,
+				FeePerRequest: tx.FeePerRequest,
+				NumOfRequests: tx.NumOfRequests,
+				IsBroadcasted: false,
+				BlkHeight:     curIncBlkHeight,
+			}
 		}
+
+		delete(feeReplacementTxArray, batchID)
 	}
 
 	return feeReplacementTxArray, txArray, nil

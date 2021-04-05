@@ -27,16 +27,18 @@ type BTCBroadcastingManager struct {
 }
 
 type BroadcastTx struct {
-	TxContent       string
-	TxHash          string
-	FeePerRequest   uint
-	NumOfRequests   uint
-	IsAcceptableFee bool
-	BlkHeight       uint64 // height of the current Incog chain height when broadcasting tx
+	TxContent     string // only has value when be broadcasted
+	TxHash        string // only has value when be broadcasted
+	TxSize        int
+	FeePerRequest uint
+	NumOfRequests uint
+	IsBroadcasted bool
+	BlkHeight     uint64 // height of the current Incog chain height when broadcasting tx
 }
 
 type FeeReplacementTx struct {
 	ReqTxID       string
+	TxSize        int
 	FeePerRequest uint
 	NumOfRequests uint
 	BlkHeight     uint64
@@ -172,7 +174,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		tempBroadcastTxArray := joinTxArray(tempBroadcastTxArray1, tempBroadcastTxArray2)
 
 		for batchID, tx := range tempBroadcastTxArray {
-			if tx.IsAcceptableFee {
+			if tx.IsBroadcasted {
 				fmt.Printf("Broadcast tx for batch %v, content %v \n", batchID, tx.TxContent)
 				err := b.broadcastTx(tx.TxContent)
 				if err != nil {
@@ -196,7 +198,7 @@ func (b *BTCBroadcastingManager) Execute() {
 
 		confirmedBatchIDChan := make(chan map[string]*ConfirmedTx, len(broadcastTxArray))
 		for batchID, tx := range broadcastTxArray {
-			if tx.IsAcceptableFee {
+			if tx.IsBroadcasted {
 				curBatchID := batchID
 				curTx := tx
 
@@ -256,7 +258,7 @@ func (b *BTCBroadcastingManager) Execute() {
 			curTx := tx
 
 			if b.isTimeoutBTCTx(curTx, curIncBlkHeight) { // waiting too long
-				newFee := utils.GetNewFee(len(curTx.TxContent), curTx.FeePerRequest, curTx.NumOfRequests, b.bitcoinFee)
+				newFee := utils.GetNewFee(curTx.TxSize, curTx.FeePerRequest, curTx.NumOfRequests, b.bitcoinFee)
 				fmt.Printf("Old fee %v, request new fee %v for batchID %v\n", curTx.FeePerRequest, newFee, curBatchID)
 				// notify the Inc chain for fee replacement
 				wg.Add(1)
@@ -272,6 +274,7 @@ func (b *BTCBroadcastingManager) Execute() {
 						b.ExportErrorLog(fmt.Sprintf("Could not request RBF tx status for batch %v, txID %v - with err: %v", curBatchID, txID, err))
 					} else {
 						if status == 0 { // rejected
+							txID = ""
 							b.ExportErrorLog(fmt.Sprintf("Send RBF request failed for batch %v, txID %v - with err: %v", curBatchID, txID, err))
 						} else {
 							b.ExportInfoLog(fmt.Sprintf("Send RBF request succeed for batch %v, txID: %v", curBatchID, txID))
@@ -279,6 +282,7 @@ func (b *BTCBroadcastingManager) Execute() {
 						replacedBatchIDChan <- map[string]*FeeReplacementTx{
 							curBatchID: {
 								ReqTxID:       txID,
+								TxSize:        curTx.TxSize,
 								FeePerRequest: newFee,
 								NumOfRequests: curTx.NumOfRequests,
 								BlkHeight:     curIncBlkHeight,
