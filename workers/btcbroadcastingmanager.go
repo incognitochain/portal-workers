@@ -107,20 +107,19 @@ func (b *BTCBroadcastingManager) Execute() {
 			b.ExportErrorLog(fmt.Sprintf("Could not get bitcoin fee - with err: %v", err))
 			return
 		}
-		curIncBlkHeight, err := b.getLatestBeaconHeight()
-		if err != nil {
-			b.ExportErrorLog(fmt.Sprintf("Could not get latest beacon height - with err: %v", err))
-			return
-		}
 
-		// wait until next block available
-		for nextBlkHeight >= curIncBlkHeight {
-			time.Sleep(10 * time.Second)
+		// wait until next blocks available
+		var curIncBlkHeight uint64
+		for {
 			curIncBlkHeight, err = b.getLatestBeaconHeight()
 			if err != nil {
 				b.ExportErrorLog(fmt.Sprintf("Could not get latest beacon height - with err: %v", err))
 				return
 			}
+			if nextBlkHeight < curIncBlkHeight {
+				break
+			}
+			time.Sleep(40 * time.Second)
 		}
 
 		var IncBlockBatchSize uint64
@@ -141,7 +140,7 @@ func (b *BTCBroadcastingManager) Execute() {
 
 		for batchID, value := range feeReplacementTxArray {
 			if value.BlkHeight+ProcessedBlkCacheDepth < curIncBlkHeight {
-				delete(confirmedTxArray, batchID)
+				delete(feeReplacementTxArray, batchID)
 			}
 		}
 
@@ -166,7 +165,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		}
 		feeReplacementTxArray, tempBroadcastTxArray2, err = b.getBroadcastReplacementTx(feeReplacementTxArray, curIncBlkHeight)
 		if err != nil {
-			b.ExportErrorLog(fmt.Sprintf("Could not retrieve get broadcast txs - with err: %v", err))
+			b.ExportErrorLog(fmt.Sprintf("Could not retrieve RBF broadcast txs - with err: %v", err))
 			return
 		}
 
