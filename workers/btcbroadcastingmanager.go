@@ -278,7 +278,7 @@ func (b *BTCBroadcastingManager) Execute() {
 							b.ExportInfoLog(fmt.Sprintf("Send RBF request succeed for batch %v, txID: %v", curBatchID, txID))
 						}
 						replacedBatchIDChan <- map[string]*FeeReplacementTx{
-							batchID: {
+							curBatchID: {
 								ReqTxID:       txID,
 								FeePerRequest: newFee,
 								NumOfRequests: curTx.NumOfRequests,
