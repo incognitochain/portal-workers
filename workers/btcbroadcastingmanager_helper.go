@@ -311,7 +311,7 @@ func (b *BTCBroadcastingManager) getRequestFeeReplacementTxStatus(txID string) (
 	var err error
 	for idx := 0; idx < NUM_GET_STATUS_TRIES; idx++ {
 		time.Sleep(INTERVAL_TRIES)
-		err = b.RPCClient.RPCCall("getportalreplacementfeestatus", params, &feeReplacementStatusRes)
+		err = b.RPCClient.RPCCall("getportalreplacebyfeestatus", params, &feeReplacementStatusRes)
 		if err == nil && feeReplacementStatusRes.RPCError == nil {
 			return feeReplacementStatusRes.Result.Status, nil
 		}
