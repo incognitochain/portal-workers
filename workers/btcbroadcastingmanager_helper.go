@@ -41,6 +41,24 @@ func (b *BTCBroadcastingManager) isConfirmedBTCTx(txHash string) (bool, uint64) 
 	return tx.Confirmations >= BTCConfirmationThreshold, uint64(tx.BlockHeight)
 }
 
+func (b *BTCBroadcastingManager) getVSizeBTCTx(txContent string) (int, error) {
+	// Decode the serialized transaction hex to raw bytes.
+	serializedTx, err := hex.DecodeString(txContent)
+	if err != nil {
+		b.ExportErrorLog(fmt.Sprintf("Could not serialized tx content %v - with err: %v \n", txContent, err))
+		return 0, err
+	}
+
+	txRawResult, err := b.btcClient.DecodeRawTransaction(serializedTx)
+	if err != nil {
+		fmt.Printf("Could not decode tx content %v - with err: %v \n", txContent, err)
+		// b.ExportErrorLog(fmt.Sprintf("Could not decode tx content %v - with err: %v \n", txContent, err))
+		return 0, err
+	}
+
+	return int(txRawResult.Vsize), nil
+}
+
 func (b *BTCBroadcastingManager) broadcastTx(txContent string) error {
 	// Decode the serialized transaction hex to raw bytes.
 	serializedTx, err := hex.DecodeString(txContent)
@@ -150,7 +168,10 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchI
 
 			btcTxContent := signedRawTxRes.Result.SignedTx
 			btcTxHash := signedRawTxRes.Result.TxID
-			btcTxSize := len(btcTxContent)
+			btcTxSize, err := b.getVSizeBTCTx(btcTxContent)
+			if err != nil {
+				continue
+			}
 
 			feePerRequest, numberRequest := b.getLatestBatchInfo(batch)
 			acceptableFee := utils.IsEnoughFee(btcTxSize, feePerRequest, numberRequest, b.bitcoinFee)
