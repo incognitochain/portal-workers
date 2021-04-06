@@ -20,7 +20,7 @@ import (
 func (b *BTCBroadcastingManager) isTimeoutBTCTx(tx *BroadcastTx, curBlockHeight uint64) bool {
 	broadcastBlockHeight := tx.BlkHeight
 
-	if tx.IsBroadcasted {
+	if !tx.IsBroadcasted {
 		return curBlockHeight-broadcastBlockHeight >= TimeIntervalBTCFeeReplacement
 	} else {
 		if curBlockHeight-broadcastBlockHeight < TimeoutBTCFeeReplacement {
