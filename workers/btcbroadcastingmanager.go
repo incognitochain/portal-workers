@@ -15,7 +15,7 @@ import (
 
 const InitIncBlockBatchSize = 1000
 const FirstBroadcastTxBlockHeight = 1
-const TimeoutBTCFeeReplacement = 100
+const TimeoutBTCFeeReplacement = 200
 const TimeIntervalBTCFeeReplacement = 50
 const ProcessedBlkCacheDepth = 10000
 
@@ -214,9 +214,9 @@ func (b *BTCBroadcastingManager) Execute() {
 				isConfirmed, btcBlockHeight := b.isConfirmedBTCTx(curTx.TxHash)
 
 				if isConfirmed && btcBlockHeight+BTCConfirmationThreshold <= relayingBTCHeight {
+					fmt.Printf("BTC Tx %v is confirmed\n", curTx.TxHash)
 					// generate BTC proof
 					btcProof, err := b.buildProof(curTx.TxHash, btcBlockHeight)
-					fmt.Printf("%+v\n", btcProof)
 					if err != nil {
 						b.ExportErrorLog(fmt.Sprintf("Could not generate BTC proof for batch %v - with err: %v", curBatchID, err))
 						continue
