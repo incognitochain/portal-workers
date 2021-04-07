@@ -83,14 +83,14 @@ func (b *BTCBroadcastingManager) broadcastTx(txContent string) error {
 }
 
 // Return fee per unshield request and number of requests
-func (b *BTCBroadcastingManager) getLatestBatchInfo(batch *entities.ProcessedUnshieldRequestBatch) (uint, uint) {
-	maxFee := uint(0)
+func (b *BTCBroadcastingManager) getUnshieldFeeInfo(batch *entities.ProcessedUnshieldRequestBatch) (uint, uint) {
+	minFee := uint(0)
 	for _, fee := range batch.ExternalFees {
-		if fee > maxFee {
-			maxFee = fee
+		if minFee <= 0 || fee < minFee {
+			minFee = fee
 		}
 	}
-	return maxFee, uint(len(batch.UnshieldsID))
+	return minFee, uint(len(batch.UnshieldsID))
 }
 
 func (b *BTCBroadcastingManager) getLatestBeaconHeight() (uint64, error) {
@@ -173,7 +173,7 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchI
 				continue
 			}
 
-			feePerRequest, numberRequest := b.getLatestBatchInfo(batch)
+			feePerRequest, numberRequest := b.getUnshieldFeeInfo(batch)
 			acceptableFee := utils.IsEnoughFee(btcTxSize, feePerRequest, numberRequest, b.bitcoinFee)
 			txArray[batch.BatchID] = &BroadcastTx{
 				TxContent:     btcTxContent,
