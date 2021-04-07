@@ -7,21 +7,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/blockcypher/gobcy"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/incognitochain/portal-workers/entities"
 	"github.com/incognitochain/portal-workers/metadata"
 	"github.com/incognitochain/portal-workers/utils"
 )
-
-func (b *BTCWalletMonitor) isReceivingTx(tx *gobcy.TX, btcAddresss string) bool {
-	for _, input := range tx.Inputs {
-		if input.Addresses[0] == btcAddresss {
-			return false
-		}
-	}
-	return true
-}
 
 func (b *BTCWalletMonitor) buildProof(txID string, blkHeight uint64) (string, error) {
 	cypherBlock, err := b.bcy.GetBlock(

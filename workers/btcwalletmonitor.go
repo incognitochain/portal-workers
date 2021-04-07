@@ -124,32 +124,37 @@ func (b *BTCWalletMonitor) Execute() {
 			incAddress := trackingInstance.IncAddress
 			lastBTCHeightTracked := trackingInstance.LastBTCHeightTrack
 
-			addrInfo, err := b.bcy.GetAddrFull(btcAddress, map[string]string{
+			addrInfo, err := b.bcy.GetAddr(btcAddress, map[string]string{
 				"after":         strconv.FormatUint(lastBTCHeightTracked+1, 10),
 				"confirmations": strconv.FormatInt(int64(BTCConfirmationThreshold), 10),
+				"unspentOnly":   "true",
 			})
 			if err != nil {
 				b.ExportErrorLog(fmt.Sprintf("Could not retrieve tx to address %v - with err: %v", btcAddress, err))
 				continue
 			}
 
-			for _, tx := range addrInfo.TXs {
+			for _, tx := range addrInfo.TXRefs {
+				if tx.BlockHeight <= 0 {
+					continue
+				}
+
 				time.Sleep(1 * time.Second)
 				// update last btc block height tracked
-				if tx.BlockHeight > 0 && uint64(tx.BlockHeight) > lastBTCHeightTracked {
+				if uint64(tx.BlockHeight) > lastBTCHeightTracked {
 					lastBTCHeightTracked = uint64(tx.BlockHeight)
 				}
 
-				if b.isReceivingTx(&tx, btcAddress) {
+				if tx.TXOutputN != -1 {
 					// generate proof
-					proof, err := b.buildProof(tx.Hash, uint64(tx.BlockHeight))
+					proof, err := b.buildProof(tx.TXHash, uint64(tx.BlockHeight))
 					if err != nil {
-						b.ExportErrorLog(fmt.Sprintf("Could not build proof for tx: %v - with err: %v", tx.Hash, err))
+						b.ExportErrorLog(fmt.Sprintf("Could not build proof for tx: %v - with err: %v", tx.TXHash, err))
 						continue
 					}
 
-					fmt.Printf("Found shielding request for address %v, with BTC tx %v\n", incAddress, tx.Hash)
-					waitingShieldingList[tx.Hash] = &ShieldingRequestInfo{
+					fmt.Printf("Found shielding request for address %v, with BTC tx %v\n", incAddress, tx.TXHash)
+					waitingShieldingList[tx.TXHash] = &ShieldingRequestInfo{
 						IncAddress:     incAddress,
 						Proof:          proof,
 						BTCBlockHeight: uint64(tx.BlockHeight),
