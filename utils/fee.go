@@ -17,7 +17,7 @@ type FeeAPIResponseBody struct {
 	HourFee     uint `json:"hourFee"`
 }
 
-// Get fee in the current bitcoin condition (satoshi / kb)
+// Get fee in the current bitcoin condition (satoshi / vbyte)
 func GetCurrentRelayingFee() (uint, error) {
 	response, err := http.Get("https://bitcoinfees.earn.com/api/v1/fees/recommended")
 	if err != nil {
