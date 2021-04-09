@@ -37,9 +37,9 @@ func GetCurrentRelayingFee() (uint, error) {
 }
 
 // Get new fee per request (nano pToken)
-func GetNewFee(txSize int, oldFeePerUnshieldRequest uint, numberOfUnshieldRequest uint, currentRelayingFee uint) uint { // pToken
+func GetNewFee(vsize int, oldFeePerUnshieldRequest uint, numberOfUnshieldRequest uint, currentRelayingFee uint) uint { // pToken
 	oldFee := uint64(oldFeePerUnshieldRequest) * uint64(numberOfUnshieldRequest) / 10 // oldFee: satoshi, oldFeePerUnshieldRequest: nano pBTC
-	newFee := uint64(float64(currentRelayingFee) * float64(txSize) * OVERPAYING_RATE)
+	newFee := uint64(float64(currentRelayingFee) * float64(vsize) * OVERPAYING_RATE)
 
 	if newFee < oldFee || newFee > uint64(float64(oldFee)*DEFAULT_RATE_INCREASING_STEP) {
 		newFee = uint64(float64(oldFee) * DEFAULT_RATE_INCREASING_STEP)
@@ -49,8 +49,8 @@ func GetNewFee(txSize int, oldFeePerUnshieldRequest uint, numberOfUnshieldReques
 	return newFeePerUnshieldRequest
 }
 
-func IsEnoughFee(txSize int, feePerRequest uint, numberOfRequest uint, currentRelayingFee uint) bool {
+func IsEnoughFee(vsize int, feePerRequest uint, numberOfRequest uint, currentRelayingFee uint) bool {
 	fee := uint64(feePerRequest) * uint64(numberOfRequest) / 10 // fee: satoshi, feePerRequest: nano pToken
-	expectedFee := uint64(float64(currentRelayingFee) * float64(txSize) * OVERPAYING_RATE)
+	expectedFee := uint64(float64(currentRelayingFee) * float64(vsize) * OVERPAYING_RATE)
 	return fee >= expectedFee
 }

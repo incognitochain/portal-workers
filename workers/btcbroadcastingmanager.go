@@ -31,7 +31,7 @@ type BTCBroadcastingManager struct {
 type BroadcastTx struct {
 	TxContent     string // only has value when be broadcasted
 	TxHash        string // only has value when be broadcasted
-	TxSize        int
+	VSize         int
 	FeePerRequest uint
 	NumOfRequests uint
 	IsBroadcasted bool
@@ -40,7 +40,7 @@ type BroadcastTx struct {
 
 type FeeReplacementTx struct {
 	ReqTxID       string
-	TxSize        int
+	VSize         int
 	FeePerRequest uint
 	NumOfRequests uint
 	BlkHeight     uint64
@@ -267,7 +267,7 @@ func (b *BTCBroadcastingManager) Execute() {
 			curTx := tx
 
 			if b.isTimeoutBTCTx(curTx, curIncBlkHeight) { // waiting too long
-				newFee := utils.GetNewFee(curTx.TxSize, curTx.FeePerRequest, curTx.NumOfRequests, b.bitcoinFee)
+				newFee := utils.GetNewFee(curTx.VSize, curTx.FeePerRequest, curTx.NumOfRequests, b.bitcoinFee)
 				fmt.Printf("Old fee %v, request new fee %v for batchID %v\n", curTx.FeePerRequest, newFee, curBatchID)
 				// notify the Inc chain for fee replacement
 				wg.Add(1)
@@ -291,7 +291,7 @@ func (b *BTCBroadcastingManager) Execute() {
 						replacedBatchIDChan <- map[string]*FeeReplacementTx{
 							curBatchID: {
 								ReqTxID:       txID,
-								TxSize:        curTx.TxSize,
+								VSize:         curTx.VSize,
 								FeePerRequest: newFee,
 								NumOfRequests: curTx.NumOfRequests,
 								BlkHeight:     curIncBlkHeight,

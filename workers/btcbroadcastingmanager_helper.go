@@ -168,17 +168,17 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchI
 
 			btcTxContent := signedRawTxRes.Result.SignedTx
 			btcTxHash := signedRawTxRes.Result.TxID
-			btcTxSize, err := b.getVSizeBTCTx(btcTxContent)
+			vsize, err := b.getVSizeBTCTx(btcTxContent)
 			if err != nil {
 				continue
 			}
 
 			feePerRequest, numberRequest := b.getUnshieldFeeInfo(batch)
-			acceptableFee := utils.IsEnoughFee(btcTxSize, feePerRequest, numberRequest, b.bitcoinFee)
+			acceptableFee := utils.IsEnoughFee(vsize, feePerRequest, numberRequest, b.bitcoinFee)
 			txArray[batch.BatchID] = &BroadcastTx{
 				TxContent:     btcTxContent,
 				TxHash:        btcTxHash,
-				TxSize:        btcTxSize,
+				VSize:         vsize,
 				FeePerRequest: feePerRequest,
 				NumOfRequests: numberRequest,
 				IsBroadcasted: acceptableFee,
@@ -194,7 +194,7 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 	txArray := map[string]*BroadcastTx{}
 
 	for batchID, tx := range feeReplacementTxArray {
-		acceptableFee := utils.IsEnoughFee(tx.TxSize, tx.FeePerRequest, tx.NumOfRequests, b.bitcoinFee)
+		acceptableFee := utils.IsEnoughFee(tx.VSize, tx.FeePerRequest, tx.NumOfRequests, b.bitcoinFee)
 		if acceptableFee && tx.ReqTxID != "" {
 			params = []interface{}{
 				map[string]string{
@@ -217,7 +217,7 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 			txArray[batchID] = &BroadcastTx{
 				TxContent:     btcTxContent,
 				TxHash:        btcTxHash,
-				TxSize:        tx.TxSize,
+				VSize:         tx.VSize,
 				FeePerRequest: tx.FeePerRequest,
 				NumOfRequests: tx.NumOfRequests,
 				IsBroadcasted: true,
@@ -227,7 +227,7 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 			txArray[batchID] = &BroadcastTx{
 				TxContent:     "",
 				TxHash:        "",
-				TxSize:        tx.TxSize,
+				VSize:         tx.VSize,
 				FeePerRequest: tx.FeePerRequest,
 				NumOfRequests: tx.NumOfRequests,
 				IsBroadcasted: false,
