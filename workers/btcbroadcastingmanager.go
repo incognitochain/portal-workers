@@ -92,6 +92,10 @@ func (b *BTCBroadcastingManager) ExportInfoLog(msg string) {
 	b.WorkerAbs.ExportInfoLog(msg)
 }
 
+// This function will execute a worker that has 3 main tasks:
+// - Broadcast a unshielding transaction to Bitcoin network
+// - Check for a Bitcoin transaction is stuck or not and request RBF transaction
+// - Check a broadcasted Bitcoin transaction confirmation and notify the Incognito chain
 func (b *BTCBroadcastingManager) Execute() {
 	b.Logger.Info("BTCBroadcastingManager worker is executing...")
 	defer b.db.Close()

@@ -68,6 +68,9 @@ func (b *BTCWalletMonitor) ExportInfoLog(msg string) {
 	b.WorkerAbs.ExportInfoLog(msg)
 }
 
+// This function will execute a worker that has 2 main tasks:
+// - Monitor Bitcoin multisig wallets that corresponding with Incognito Wallet App users
+// - Send shielding request on behalf of users to Incognito chain
 func (b *BTCWalletMonitor) Execute() {
 	b.Logger.Info("BTCWalletMonitor worker is executing...")
 	defer b.db.Close()
