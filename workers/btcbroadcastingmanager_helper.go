@@ -202,12 +202,12 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 				},
 			}
 			var signedRawTxRes entities.SignedRawTxRes
-			err := b.RPCClient.RPCCall("getporalsignedrawreplacebyfeetransaction", params, &signedRawTxRes)
+			err := b.RPCClient.RPCCall("getportalsignedrawreplacebyfeetransaction", params, &signedRawTxRes)
 			if err != nil {
 				return feeReplacementTxArray, txArray, err
 			}
 			if signedRawTxRes.RPCError != nil {
-				b.Logger.Errorf("getporalsignedrawreplacebyfeetransaction: call RPC for ReqTxID %v - with err %v\n", tx.ReqTxID, signedRawTxRes.RPCError.StackTrace)
+				b.Logger.Errorf("getportalsignedrawreplacebyfeetransaction: call RPC for ReqTxID %v - with err %v\n", tx.ReqTxID, signedRawTxRes.RPCError.StackTrace)
 				continue
 			}
 
