@@ -55,7 +55,7 @@ func (b *BTCWalletMonitor) submitShieldingRequest(incAddress string, proof strin
 	params := []interface{}{
 		os.Getenv("INCOGNITO_PRIVATE_KEY"),
 		nil,
-		-1,
+		5,
 		0,
 		map[string]interface{}{
 			"IncogAddressStr": incAddress,
