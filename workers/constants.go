@@ -12,7 +12,6 @@ const (
 	NUM_GET_STATUS_TRIES = 3
 	INTERVAL_TRIES       = 1 * time.Minute
 
-	PortalShieldingRequestMeta      = 250
 	PortalReplacementFeeRequestMeta = 255
 	PortalSubmitConfirmedTxMeta     = 256
 )

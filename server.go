@@ -31,7 +31,7 @@ func NewServer() *Server {
 	}
 
 	listWorkers = append(listWorkers, btcBroadcastingManager)
-	// listWorkers = append(listWorkers, btcWalletMonitorWorker)
+	listWorkers = append(listWorkers, btcWalletMonitorWorker)
 
 	quitChan := make(chan os.Signal, 1)
 	// signal.Notify(quitChan, syscall.SIGTERM)

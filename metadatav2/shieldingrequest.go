@@ -1,13 +1,14 @@
 package metadata
 
 import (
-	"github.com/0xkraken/incognito-sdk-golang/common"
+	"github.com/inc-backend/go-incognito/common"
+	"github.com/inc-backend/go-incognito/metadata"
 )
 
 // PortalShieldingRequest - portal user requests ptoken (after sending pubToken to multisig wallet)
 // metadata - portal user sends shielding request - create normal tx with this metadata
 type PortalShieldingRequest struct {
-	MetadataBase
+	metadata.MetadataBase
 	TokenID         string // pTokenID in incognito chain
 	IncogAddressStr string
 	ShieldingProof  string
@@ -18,7 +19,7 @@ func NewPortalShieldingRequest(
 	tokenID string,
 	incogAddressStr string,
 	shieldingProof string) (*PortalShieldingRequest, error) {
-	metadataBase := MetadataBase{
+	metadataBase := metadata.MetadataBase{
 		Type: metaType,
 	}
 	shieldingRequestMeta := &PortalShieldingRequest{

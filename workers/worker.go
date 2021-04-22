@@ -4,19 +4,22 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
+	"github.com/inc-backend/go-incognito/src/httpclient"
 	"github.com/incognitochain/portal-workers/utils"
 	"github.com/sirupsen/logrus"
 )
 
 type WorkerAbs struct {
-	ID        int
-	Name      string
-	Frequency int // in sec
-	Quit      chan bool
-	RPCClient *utils.HttpClient
-	Network   string // mainnet, testnet, ...
-	Logger    *logrus.Entry
+	ID          int
+	Name        string
+	Frequency   int // in sec
+	Quit        chan bool
+	RPCClient   *utils.HttpClient
+	RPCClientV2 *httpclient.HttpClient
+	Network     string // mainnet, testnet, ...
+	Logger      *logrus.Entry
 }
 
 type Worker interface {
@@ -35,7 +38,10 @@ func (a *WorkerAbs) Init(id int, name string, freq int, network string) error {
 	a.Name = name
 	a.Frequency = freq
 	a.Quit = make(chan bool)
+
 	a.RPCClient = utils.NewHttpClient("", os.Getenv("INCOGNITO_PROTOCOL"), os.Getenv("INCOGNITO_HOST"), os.Getenv("INCOGNITO_PORT"))
+	port, _ := strconv.Atoi(os.Getenv("INCOGNITO_PORT"))
+	a.RPCClientV2 = httpclient.NewHttpClient("", os.Getenv("INCOGNITO_PROTOCOL"), os.Getenv("INCOGNITO_HOST"), uint(port))
 	a.Network = network
 	logger, err := instantiateLogger(a.Name)
 	if err != nil {
