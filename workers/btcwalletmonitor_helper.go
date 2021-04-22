@@ -77,7 +77,7 @@ func (b *BTCWalletMonitor) submitShieldingRequest(incAddress string, proof strin
 	newParam = append(newParam, base58CheckData)
 
 	var sendRawTxRes entities.SendRawTxRes
-	err = b.RPCClient.RPCCall("sendrawtransaction", newParam, &sendRawTxRes)
+	err = b.RPCClient.RPCCall("sendtransaction", newParam, &sendRawTxRes)
 	if err != nil {
 		return "", err
 	}
