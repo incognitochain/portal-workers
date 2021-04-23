@@ -59,7 +59,7 @@ func (b *BTCWalletMonitor) submitShieldingRequest(incAddress string, proof strin
 		0,
 		map[string]interface{}{
 			"IncogAddressStr": incAddress,
-			"TokenID":         "",
+			"TokenID":         BTCID,
 			"ShieldingProof":  proof,
 		},
 	}
