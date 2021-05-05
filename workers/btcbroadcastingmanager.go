@@ -3,11 +3,9 @@ package workers
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
-	"github.com/blockcypher/gobcy"
 	"github.com/btcsuite/btcd/rpcclient"
 	go_incognito "github.com/inc-backend/go-incognito"
 	"github.com/incognitochain/portal-workers/utils"
@@ -23,8 +21,6 @@ const ProcessedBlkCacheDepth = 10000
 type BTCBroadcastingManager struct {
 	WorkerAbs
 	Portal     *go_incognito.Portal
-	bcy        gobcy.API
-	bcyChain   gobcy.Blockchain
 	btcClient  *rpcclient.Client
 	bitcoinFee uint
 	db         *leveldb.DB
@@ -63,13 +59,6 @@ func (b *BTCBroadcastingManager) Init(id int, name string, freq int, network str
 	err := b.WorkerAbs.Init(id, name, freq, network)
 
 	b.Portal = go_incognito.NewPortal(b.Client)
-	// init blockcypher instance
-	b.bcy = gobcy.API{Token: os.Getenv("BLOCKCYPHER_TOKEN"), Coin: "btc", Chain: b.GetNetwork()}
-	b.bcyChain, err = b.bcy.GetChain()
-	if err != nil {
-		b.ExportErrorLog(fmt.Sprintf("Could not get btc chain info from cypher api - with err: %v", err))
-		return err
-	}
 
 	// init leveldb instance
 	b.db, err = leveldb.OpenFile("db/broadcastingmanager", nil)

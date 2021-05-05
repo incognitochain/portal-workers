@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/inc-backend/go-incognito/publish/transformer"
 	"github.com/incognitochain/portal-workers/entities"
@@ -26,18 +27,28 @@ func (b *BTCBroadcastingManager) isTimeoutBTCTx(tx *BroadcastTx, curBlockHeight 
 			return false
 		}
 
-		bcyTx, err := b.bcy.GetTX(tx.TxHash, nil)
-		return err != nil || bcyTx.Confirmations <= 0 || bcyTx.BlockHeight <= 0
+		txHash, _ := chainhash.NewHashFromStr(tx.TxHash)
+		tx, err := b.btcClient.GetRawTransactionVerbose(txHash)
+		return err != nil || tx.Confirmations <= 0
 	}
 }
 
 // return boolean value of transaction confirmation and bitcoin block height
 func (b *BTCBroadcastingManager) isConfirmedBTCTx(txHash string) (bool, uint64) {
-	tx, err := b.bcy.GetTX(txHash, nil)
+	txID, _ := chainhash.NewHashFromStr(txHash)
+	tx, err := b.btcClient.GetRawTransactionVerbose(txID)
 	if err != nil {
 		return false, 0
 	}
-	return tx.Confirmations >= BTCConfirmationThreshold, uint64(tx.BlockHeight)
+	if tx.Confirmations >= BTCConfirmationThreshold {
+		blkHash, _ := chainhash.NewHashFromStr(tx.BlockHash)
+		blk, err := b.btcClient.GetBlockHeaderVerbose(blkHash)
+		if err != nil {
+			return false, 0
+		}
+		return true, uint64(blk.Height)
+	}
+	return false, 0
 }
 
 func (b *BTCBroadcastingManager) getVSizeBTCTx(txContent string) (int, error) {
