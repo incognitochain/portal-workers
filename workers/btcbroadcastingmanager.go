@@ -224,7 +224,7 @@ func (b *BTCBroadcastingManager) Execute() {
 				if isConfirmed && btcBlockHeight+BTCConfirmationThreshold <= relayingBTCHeight {
 					fmt.Printf("BTC Tx %v is confirmed\n", curTx.TxHash)
 					// generate BTC proof
-					btcProof, err := b.buildProof(curTx.TxHash, btcBlockHeight)
+					btcProof, err := utils.BuildProof(b.btcClient, curTx.TxHash, btcBlockHeight)
 					if err != nil {
 						b.ExportErrorLog(fmt.Sprintf("Could not generate BTC proof for batch %v - with err: %v", curBatchID, err))
 						continue

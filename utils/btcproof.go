@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -132,4 +133,43 @@ func BuildMerkleProof(txHashes []*chainhash.Hash, targetedTxHash *chainhash.Hash
 		}
 	}
 	return merkleProofs
+}
+
+func BuildProof(btcClient *rpcclient.Client, txID string, blkHeight uint64) (string, error) {
+	blkHash, err := btcClient.GetBlockHash(int64(blkHeight))
+	if err != nil {
+		return "", err
+	}
+
+	msgBlk, err := btcClient.GetBlock(blkHash)
+	if err != nil {
+		return "", err
+	}
+
+	txHashes := []*chainhash.Hash{}
+	for _, tx := range msgBlk.Transactions {
+		txHash := tx.TxHash()
+		txHashes = append(txHashes, &txHash)
+	}
+	txHash, err := chainhash.NewHashFromStr(txID)
+	if err != nil {
+		return "", err
+	}
+
+	tx, err := btcClient.GetRawTransaction(txHash)
+	if err != nil {
+		return "", err
+	}
+	msgTx := tx.MsgTx()
+
+	merkleProofs := BuildMerkleProof(txHashes, txHash)
+	btcProof := BTCProof{
+		MerkleProofs: merkleProofs,
+		BTCTx:        msgTx,
+		BlockHash:    blkHash,
+	}
+	btcProofBytes, _ := json.Marshal(btcProof)
+	btcProofStr := base64.StdEncoding.EncodeToString(btcProofBytes)
+
+	return btcProofStr, nil
 }

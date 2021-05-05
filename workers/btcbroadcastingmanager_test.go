@@ -2,23 +2,28 @@ package workers
 
 import (
 	"fmt"
-	"os"
 	"testing"
 
-	"github.com/blockcypher/gobcy"
 	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/incognitochain/portal-workers/utils"
 )
 
 func TestBuildProof(t *testing.T) {
 
 	b := &BTCBroadcastingManager{}
-	b.Network = "test3"
-	b.bcy = gobcy.API{Token: os.Getenv("BLOCKCYPHER_TOKEN"), Coin: "btc", Chain: b.GetNetwork()}
+	// init bitcoin rpcclient
+	connCfg := &rpcclient.ConnConfig{
+		Host:         fmt.Sprintf("%s:%s", "51.161.119.66", "18443"),
+		User:         "thach",
+		Pass:         "deptrai",
+		HTTPPostMode: true, // Bitcoin core only supports HTTP POST mode
+		DisableTLS:   true, // Bitcoin core does not provide TLS by default
+	}
+
 	var err error
-	b.bcyChain, err = b.bcy.GetChain()
+	b.btcClient, err = rpcclient.New(connCfg, nil)
 	if err != nil {
-		t.Logf("Could not get btc chain info from cypher api - with err: %v", err)
-		return
+		t.FailNow()
 	}
 
 	var txHash string
@@ -27,7 +32,7 @@ func TestBuildProof(t *testing.T) {
 
 	txHash = "9fbfc05bc9359544ff1925ea89812ed81f38353af13f83cd34439f83769c6ba4"
 	btcBlockHeight = 1937581
-	btcProof, err = b.buildProof(txHash, btcBlockHeight)
+	btcProof, err = utils.BuildProof(b.btcClient, txHash, btcBlockHeight)
 	if err != nil {
 		t.Logf("Gen proof failed - with err: %v", err)
 		return

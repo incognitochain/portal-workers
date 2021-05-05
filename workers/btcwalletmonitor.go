@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/blockcypher/gobcy"
+	"github.com/btcsuite/btcd/rpcclient"
 	go_incognito "github.com/inc-backend/go-incognito"
+	"github.com/incognitochain/portal-workers/utils"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -17,10 +19,11 @@ const TimeoutTrackingInstanceInSecond = int64(2 * 60 * 60)
 
 type BTCWalletMonitor struct {
 	WorkerAbs
-	Portal   *go_incognito.Portal
-	bcy      gobcy.API
-	bcyChain gobcy.Blockchain
-	db       *leveldb.DB
+	Portal    *go_incognito.Portal
+	bcy       gobcy.API
+	bcyChain  gobcy.Blockchain
+	btcClient *rpcclient.Client
+	db        *leveldb.DB
 }
 
 type ShieldingMonitoringInfo struct {
@@ -58,6 +61,13 @@ func (b *BTCWalletMonitor) Init(id int, name string, freq int, network string) e
 	b.db, err = leveldb.OpenFile("db/walletmonitor", nil)
 	if err != nil {
 		b.ExportErrorLog(fmt.Sprintf("Could not open leveldb storage file - with err: %v", err))
+		return err
+	}
+
+	// init bitcoin rpcclient
+	b.btcClient, err = utils.BuildBTCClient()
+	if err != nil {
+		b.ExportErrorLog(fmt.Sprintf("Could not initialize Bitcoin RPCClient - with err: %v", err))
 		return err
 	}
 
@@ -147,7 +157,7 @@ func (b *BTCWalletMonitor) Execute() {
 
 				if tx.TXOutputN != -1 {
 					// generate proof
-					proof, err := b.buildProof(tx.TXHash, uint64(tx.BlockHeight))
+					proof, err := utils.BuildProof(b.btcClient, tx.TXHash, uint64(tx.BlockHeight))
 					if err != nil {
 						b.ExportErrorLog(fmt.Sprintf("Could not build proof for tx: %v - with err: %v", tx.TXHash, err))
 						continue

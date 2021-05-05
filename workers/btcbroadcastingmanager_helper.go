@@ -2,16 +2,13 @@ package workers
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/inc-backend/go-incognito/publish/transformer"
 	"github.com/incognitochain/portal-workers/entities"
@@ -241,42 +238,6 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 	}
 
 	return feeReplacementTxArray, txArray, nil
-}
-
-func (b *BTCBroadcastingManager) buildProof(txID string, blkHeight uint64) (string, error) {
-	cypherBlock, err := b.bcy.GetBlock(
-		int(blkHeight),
-		"",
-		map[string]string{
-			"txstart": "0",
-			"limit":   "500",
-		},
-	)
-
-	if err != nil {
-		return "", err
-	}
-
-	txIDs := cypherBlock.TXids
-	txHashes := make([]*chainhash.Hash, len(txIDs))
-	for i := 0; i < len(txIDs); i++ {
-		txHashes[i], _ = chainhash.NewHashFromStr(txIDs[i])
-	}
-
-	msgTx := utils.BuildMsgTxFromCypher(txID, b.GetNetwork())
-	txHash := msgTx.TxHash()
-	blkHash, _ := chainhash.NewHashFromStr(cypherBlock.Hash)
-
-	merkleProofs := utils.BuildMerkleProof(txHashes, &txHash)
-	btcProof := utils.BTCProof{
-		MerkleProofs: merkleProofs,
-		BTCTx:        msgTx,
-		BlockHash:    blkHash,
-	}
-	btcProofBytes, _ := json.Marshal(btcProof)
-	btcProofStr := base64.StdEncoding.EncodeToString(btcProofBytes)
-
-	return btcProofStr, nil
 }
 
 func (b *BTCBroadcastingManager) submitConfirmedTx(proof string, batchID string) (string, error) {
