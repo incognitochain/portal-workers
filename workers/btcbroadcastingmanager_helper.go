@@ -7,11 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/inc-backend/go-incognito/publish/transformer"
 	"github.com/incognitochain/portal-workers/entities"
 	"github.com/incognitochain/portal-workers/metadata"
 	"github.com/incognitochain/portal-workers/utils"
@@ -278,12 +280,26 @@ func (b *BTCBroadcastingManager) buildProof(txID string, blkHeight uint64) (stri
 }
 
 func (b *BTCBroadcastingManager) submitConfirmedTx(proof string, batchID string) (string, error) {
-	rpcClient, keyWallet, err := initSetParams(b.RPCClient)
+	metadata := map[string]interface{}{
+		"UnshieldProof": proof,
+		"PortalTokenID": BTCID,
+		"BatchID":       batchID,
+	}
+
+	result, err := b.Portal.SubmitConfirmedTx(os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata)
 	if err != nil {
 		return "", err
 	}
-	meta, _ := metadata.NewPortalSubmitConfirmedTxRequest(PortalSubmitConfirmedTxMeta, proof, BTCID, batchID)
-	return sendTx(rpcClient, keyWallet, meta)
+	resp, err := b.Client.SubmitRawData(result)
+	if err != nil {
+		return "", err
+	}
+
+	txID, err := transformer.TransformersTxHash(resp)
+	if err != nil {
+		return "", err
+	}
+	return txID, nil
 }
 
 func (b *BTCBroadcastingManager) getSubmitConfirmedTxStatus(txID string) (int, error) {
