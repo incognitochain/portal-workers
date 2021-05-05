@@ -9,9 +9,8 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/inc-backend/go-incognito/src/httpclient"
+	"github.com/inc-backend/go-incognito/publish/transformer"
 	"github.com/incognitochain/portal-workers/entities"
-	"github.com/incognitochain/portal-workers/transaction"
 	"github.com/incognitochain/portal-workers/utils"
 )
 
@@ -52,41 +51,26 @@ func (b *BTCWalletMonitor) buildProof(txID string, blkHeight uint64) (string, er
 }
 
 func (b *BTCWalletMonitor) submitShieldingRequest(incAddress string, proof string) (string, error) {
-	params := []interface{}{
-		os.Getenv("INCOGNITO_PRIVATE_KEY"),
-		nil,
-		5,
-		0,
-		map[string]interface{}{
-			"IncogAddressStr": incAddress,
-			"TokenID":         BTCID,
-			"ShieldingProof":  proof,
-		},
+	metadata := map[string]interface{}{
+		"IncogAddressStr": incAddress,
+		"TokenID":         BTCID,
+		"ShieldingProof":  proof,
 	}
 
-	tx := &transaction.ShieldingRequest{RpcClient: b.RPCClientV2, Params: params, Version: 2}
-
-	result, err := tx.BuildRawData()
+	result, err := b.Portal.Shielding(os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata)
 	if err != nil {
 		return "", err
 	}
-	r := result.(*httpclient.CreateTransactionResult)
-	base58CheckData := r.Base58CheckData
-
-	newParam := make([]interface{}, 0)
-	newParam = append(newParam, base58CheckData)
-
-	var sendRawTxRes entities.SendRawTxRes
-	err = b.RPCClient.RPCCall("sendtransaction", newParam, &sendRawTxRes)
+	resp, err := b.Client.SubmitRawData(result)
 	if err != nil {
 		return "", err
 	}
-	if sendRawTxRes.RPCError != nil {
-		return "", errors.New(sendRawTxRes.RPCError.Message)
+
+	txID, err := transformer.TransformersTxHash(resp)
+	if err != nil {
+		return "", err
 	}
-
-	return sendRawTxRes.Result.TxID, nil
-
+	return txID, nil
 }
 
 func (b *BTCWalletMonitor) getRequestShieldingStatus(txID string) (int, error) {

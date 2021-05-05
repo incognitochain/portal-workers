@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/blockcypher/gobcy"
+	go_incognito "github.com/inc-backend/go-incognito"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -16,6 +17,7 @@ const TimeoutTrackingInstanceInSecond = int64(2 * 60 * 60)
 
 type BTCWalletMonitor struct {
 	WorkerAbs
+	Portal   *go_incognito.Portal
 	bcy      gobcy.API
 	bcyChain gobcy.Blockchain
 	db       *leveldb.DB
@@ -42,6 +44,8 @@ type ShieldingTxArrayObject struct {
 
 func (b *BTCWalletMonitor) Init(id int, name string, freq int, network string) error {
 	err := b.WorkerAbs.Init(id, name, freq, network)
+
+	b.Portal = go_incognito.NewPortal(b.Client)
 	// init blockcypher instance
 	b.bcy = gobcy.API{Token: os.Getenv("BLOCKCYPHER_TOKEN"), Coin: "btc", Chain: b.GetNetwork()}
 	b.bcyChain, err = b.bcy.GetChain()
