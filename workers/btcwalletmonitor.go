@@ -101,6 +101,18 @@ func (b *BTCWalletMonitor) Execute() {
 		lastTimeUpdated = shieldingTxArrayObject.LastTimeStampUpdated
 	}
 
+	trackingBTCAddress := []btcutil.Address{}
+	btcAddressIndexMapping := map[string]int{}
+	for idx, instance := range shieldingMonitoringList {
+		address, err := btcutil.DecodeAddress(instance.BTCAddress, b.chainCfg)
+		if err != nil {
+			b.ExportErrorLog(fmt.Sprintf("Could not decode address %v - with err: %v", instance.BTCAddress, err))
+			continue
+		}
+		trackingBTCAddress = append(trackingBTCAddress, address)
+		btcAddressIndexMapping[instance.BTCAddress] = idx
+	}
+
 	for {
 		// get new rescanning instance from API
 		currentTimeStamp := time.Now().Unix()
@@ -110,7 +122,6 @@ func (b *BTCWalletMonitor) Execute() {
 			return
 		}
 		lastTimeUpdated = currentTimeStamp
-		shieldingMonitoringList = append(shieldingMonitoringList, newlyTrackingInstance...)
 
 		// delete timeout tracking scanned txID
 		for _, instance := range shieldingMonitoringList {
@@ -121,14 +132,19 @@ func (b *BTCWalletMonitor) Execute() {
 			}
 		}
 
-		trackingBTCAddress := []btcutil.Address{}
-		btcAddressIndexMapping := map[string]int{}
-		for idx, instance := range shieldingMonitoringList {
+		for idx, instance := range newlyTrackingInstance {
+			_, exists := btcAddressIndexMapping[instance.BTCAddress]
+			if exists {
+				continue
+			}
+
 			address, err := btcutil.DecodeAddress(instance.BTCAddress, b.chainCfg)
 			if err != nil {
 				b.ExportErrorLog(fmt.Sprintf("Could not decode address %v - with err: %v", instance.BTCAddress, err))
 				continue
 			}
+
+			shieldingMonitoringList = append(shieldingMonitoringList, instance)
 			trackingBTCAddress = append(trackingBTCAddress, address)
 			btcAddressIndexMapping[instance.BTCAddress] = idx
 		}
