@@ -252,9 +252,9 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 
 func (b *BTCBroadcastingManager) submitConfirmedTx(proof string, batchID string) (string, error) {
 	metadata := map[string]interface{}{
-		"UnshieldProof": proof,
 		"PortalTokenID": BTCID,
 		"BatchID":       batchID,
+		"UnshieldProof": proof,
 	}
 
 	result, err := b.Portal.SubmitConfirmedTx(os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata)
@@ -299,8 +299,26 @@ func (b *BTCBroadcastingManager) getSubmitConfirmedTxStatus(txID string) (int, e
 }
 
 func (b *BTCBroadcastingManager) requestFeeReplacement(batchID string, newFee uint) (string, error) {
-	// TODO
-	return "", nil
+	metadata := map[string]interface{}{
+		"PortalTokenID":  BTCID,
+		"BatchID":        batchID,
+		"ReplacementFee": fmt.Sprintf("%v", newFee),
+	}
+
+	result, err := b.Portal.ReplaceByFee(os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata)
+	if err != nil {
+		return "", err
+	}
+	resp, err := b.Client.SubmitRawData(result)
+	if err != nil {
+		return "", err
+	}
+
+	txID, err := transformer.TransformersTxHash(resp)
+	if err != nil {
+		return "", err
+	}
+	return txID, nil
 }
 
 func (b *BTCBroadcastingManager) getRequestFeeReplacementTxStatus(txID string) (int, error) {

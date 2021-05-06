@@ -80,5 +80,6 @@ func (b *BTCWalletMonitor) getLatestBTCBlockHashFromIncog() (uint64, error) {
 }
 
 func (b *BTCWalletMonitor) getTrackingInstance(from int64, to int64) ([]*ShieldingMonitoringInfo, error) {
+	// TODO
 	return []*ShieldingMonitoringInfo{}, nil
 }
