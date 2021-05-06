@@ -13,7 +13,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/inc-backend/go-incognito/publish/transformer"
 	"github.com/incognitochain/portal-workers/entities"
-	"github.com/incognitochain/portal-workers/metadata"
 	"github.com/incognitochain/portal-workers/utils"
 )
 
@@ -300,12 +299,8 @@ func (b *BTCBroadcastingManager) getSubmitConfirmedTxStatus(txID string) (int, e
 }
 
 func (b *BTCBroadcastingManager) requestFeeReplacement(batchID string, newFee uint) (string, error) {
-	rpcClient, keyWallet, err := initSetParams(b.RPCClient)
-	if err != nil {
-		return "", err
-	}
-	meta, _ := metadata.NewPortalReplacementFeeRequest(PortalReplacementFeeRequestMeta, BTCID, batchID, newFee)
-	return sendTx(rpcClient, keyWallet, meta)
+	// TODO
+	return "", nil
 }
 
 func (b *BTCBroadcastingManager) getRequestFeeReplacementTxStatus(txID string) (int, error) {

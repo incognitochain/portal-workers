@@ -3,8 +3,6 @@ module github.com/incognitochain/portal-workers
 go 1.13
 
 require (
-	github.com/0xkraken/incognito-sdk-golang v0.0.0-20201112064017-374a7f511a21
-	github.com/blockcypher/gobcy v1.3.1
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/inc-backend/go-incognito v0.0.0-00010101000000-000000000000

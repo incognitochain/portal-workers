@@ -4,33 +4,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
-	"github.com/blockcypher/gobcy"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/btcsuite/btcutil"
 	go_incognito "github.com/inc-backend/go-incognito"
 	"github.com/incognitochain/portal-workers/utils"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-const TimeoutTrackingInstanceInSecond = int64(2 * 60 * 60)
+const TimeoutTrackingInstanceInSecond = int64(365 * 24 * 60 * 60)
 
 type BTCWalletMonitor struct {
 	WorkerAbs
 	Portal    *go_incognito.Portal
-	bcy       gobcy.API
-	bcyChain  gobcy.Blockchain
 	btcClient *rpcclient.Client
+	chainCfg  *chaincfg.Params
 	db        *leveldb.DB
 }
 
 type ShieldingMonitoringInfo struct {
-	IncAddress         string
-	BTCAddress         string
-	TimeStamp          int64
-	LastBTCHeightTrack uint64
+	IncAddress  string
+	BTCAddress  string
+	TimeStamp   int64
+	ScannedTxID map[string]int64
 }
 
 type ShieldingRequestInfo struct {
@@ -49,13 +49,6 @@ func (b *BTCWalletMonitor) Init(id int, name string, freq int, network string) e
 	err := b.WorkerAbs.Init(id, name, freq, network)
 
 	b.Portal = go_incognito.NewPortal(b.Client)
-	// init blockcypher instance
-	b.bcy = gobcy.API{Token: os.Getenv("BLOCKCYPHER_TOKEN"), Coin: "btc", Chain: b.GetNetwork()}
-	b.bcyChain, err = b.bcy.GetChain()
-	if err != nil {
-		b.ExportErrorLog(fmt.Sprintf("Could not get btc chain info from cypher api - with err: %v", err))
-		return err
-	}
 
 	// init leveldb instance
 	b.db, err = leveldb.OpenFile("db/walletmonitor", nil)
@@ -69,6 +62,11 @@ func (b *BTCWalletMonitor) Init(id int, name string, freq int, network string) e
 	if err != nil {
 		b.ExportErrorLog(fmt.Sprintf("Could not initialize Bitcoin RPCClient - with err: %v", err))
 		return err
+	}
+
+	b.chainCfg = &chaincfg.TestNet3Params
+	if os.Getenv("BTC_NETWORK") == "main" {
+		b.chainCfg = &chaincfg.MainNetParams
 	}
 
 	return nil
@@ -114,66 +112,66 @@ func (b *BTCWalletMonitor) Execute() {
 		lastTimeUpdated = currentTimeStamp
 		shieldingMonitoringList = append(shieldingMonitoringList, newlyTrackingInstance...)
 
-		// delete timeout tracking instance
-		idx := 0
-		lenArr := len(shieldingMonitoringList)
-		for idx < lenArr {
-			if shieldingMonitoringList[idx].TimeStamp+TimeoutTrackingInstanceInSecond < currentTimeStamp {
-				// delete tracking instance
-				shieldingMonitoringList[idx], shieldingMonitoringList[lenArr-1] = shieldingMonitoringList[lenArr-1], shieldingMonitoringList[idx]
-				lenArr--
-			} else {
-				idx++
+		// delete timeout tracking scanned txID
+		for _, instance := range shieldingMonitoringList {
+			for txID, timestamp := range instance.ScannedTxID {
+				if timestamp+TimeoutTrackingInstanceInSecond < currentTimeStamp {
+					delete(instance.ScannedTxID, txID)
+				}
 			}
 		}
-		shieldingMonitoringList = shieldingMonitoringList[:lenArr]
 
-		// track transactions send to bitcoin addresses
-		for _, trackingInstance := range shieldingMonitoringList {
-			btcAddress := trackingInstance.BTCAddress
-			incAddress := trackingInstance.IncAddress
-			lastBTCHeightTracked := trackingInstance.LastBTCHeightTrack
-
-			addrInfo, err := b.bcy.GetAddr(btcAddress, map[string]string{
-				"after":         strconv.FormatUint(lastBTCHeightTracked+1, 10),
-				"confirmations": strconv.FormatInt(int64(BTCConfirmationThreshold), 10),
-				"unspentOnly":   "true",
-			})
+		trackingBTCAddress := []btcutil.Address{}
+		btcAddressIndexMapping := map[string]int{}
+		for idx, instance := range shieldingMonitoringList {
+			address, err := btcutil.DecodeAddress(instance.BTCAddress, b.chainCfg)
 			if err != nil {
-				b.ExportErrorLog(fmt.Sprintf("Could not retrieve tx to address %v - with err: %v", btcAddress, err))
+				b.ExportErrorLog(fmt.Sprintf("Could not decode address %v - with err: %v", instance.BTCAddress, err))
+				continue
+			}
+			trackingBTCAddress = append(trackingBTCAddress, address)
+			btcAddressIndexMapping[instance.BTCAddress] = idx
+		}
+
+		listUnspentResults, err := b.btcClient.ListUnspentMinMaxAddresses(BTCConfirmationThreshold, 99999999, trackingBTCAddress)
+		if err != nil {
+			b.ExportErrorLog(fmt.Sprintf("Could not scan list of unspent outcoins - with err: %v", err))
+			continue
+		}
+		for _, unspentCoins := range listUnspentResults {
+			btcAddress := unspentCoins.Address
+			idx := btcAddressIndexMapping[btcAddress]
+			incAddress := shieldingMonitoringList[idx].IncAddress
+
+			txHash := unspentCoins.TxID
+			_, exists := shieldingMonitoringList[idx].ScannedTxID[txHash]
+			if exists {
+				continue
+			}
+			shieldingMonitoringList[idx].ScannedTxID[txHash] = currentTimeStamp
+
+			txID, _ := chainhash.NewHashFromStr(txHash)
+			tx, _ := b.btcClient.GetRawTransactionVerbose(txID)
+			blkHash, _ := chainhash.NewHashFromStr(tx.BlockHash)
+			blk, err := b.btcClient.GetBlockHeaderVerbose(blkHash)
+			if err != nil {
+				b.ExportErrorLog(fmt.Sprintf("Could not get block height of block hash: %v - with err: %v", blkHash, err))
 				continue
 			}
 
-			for _, tx := range addrInfo.TXRefs {
-				if tx.BlockHeight <= 0 {
-					continue
-				}
-
-				time.Sleep(1 * time.Second)
-				// update last btc block height tracked
-				if uint64(tx.BlockHeight) > lastBTCHeightTracked {
-					lastBTCHeightTracked = uint64(tx.BlockHeight)
-				}
-
-				if tx.TXOutputN != -1 {
-					// generate proof
-					proof, err := utils.BuildProof(b.btcClient, tx.TXHash, uint64(tx.BlockHeight))
-					if err != nil {
-						b.ExportErrorLog(fmt.Sprintf("Could not build proof for tx: %v - with err: %v", tx.TXHash, err))
-						continue
-					}
-
-					fmt.Printf("Found shielding request for address %v, with BTC tx %v\n", incAddress, tx.TXHash)
-					waitingShieldingList[tx.TXHash] = &ShieldingRequestInfo{
-						IncAddress:     incAddress,
-						Proof:          proof,
-						BTCBlockHeight: uint64(tx.BlockHeight),
-					}
-				}
+			// generate proof
+			proof, err := utils.BuildProof(b.btcClient, txHash, uint64(blk.Height))
+			if err != nil {
+				b.ExportErrorLog(fmt.Sprintf("Could not build proof for tx: %v - with err: %v", txID, err))
+				continue
 			}
 
-			trackingInstance.LastBTCHeightTrack = lastBTCHeightTracked
-			time.Sleep(1 * time.Second)
+			fmt.Printf("Found shielding request for address %v, with BTC tx %v\n", incAddress, txID)
+			waitingShieldingList[txHash] = &ShieldingRequestInfo{
+				IncAddress:     incAddress,
+				Proof:          proof,
+				BTCBlockHeight: uint64(blk.Height),
+			}
 		}
 
 		// send shielding request RPC to Incognito chain
