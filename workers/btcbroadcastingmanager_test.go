@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/incognitochain/portal-workers/utils"
 )
@@ -38,6 +39,34 @@ func TestBuildProof(t *testing.T) {
 		return
 	}
 	t.Logf("Proof: %+v", btcProof)
+}
+
+func TestEstimateFee(t *testing.T) {
+
+	b := &BTCBroadcastingManager{}
+	// init bitcoin rpcclient
+	connCfg := &rpcclient.ConnConfig{
+		Host:         fmt.Sprintf("%s:%s", "185.254.97.164", "18443"),
+		User:         "thach",
+		Pass:         "deptrai",
+		HTTPPostMode: true, // Bitcoin core only supports HTTP POST mode
+		DisableTLS:   true, // Bitcoin core does not provide TLS by default
+	}
+
+	var err error
+	b.btcClient, err = rpcclient.New(connCfg, nil)
+	if err != nil {
+		t.FailNow()
+	}
+
+	mode := btcjson.EstimateSmartFeeMode("CONSERVATIVE")
+	result, err := b.btcClient.EstimateSmartFee(1, &mode)
+	if err != nil {
+		fmt.Printf("Error: %+v\n", err)
+		t.Fail()
+	}
+	feePerVbyte := *result.FeeRate * 1e8 / 1024
+	fmt.Printf("Fee/VByte: %+v\n", feePerVbyte)
 }
 
 func TestGetVSizeTx(t *testing.T) {
