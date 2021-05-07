@@ -27,13 +27,20 @@ func NewServer() *Server {
 	}
 
 	btcWalletMonitorWorker := &workers.BTCWalletMonitor{}
-	err = btcWalletMonitorWorker.Init(1, "BTC Wallet Monitor", 60, os.Getenv("BTC_NETWORK"))
+	err = btcWalletMonitorWorker.Init(2, "BTC Wallet Monitor", 60, os.Getenv("BTC_NETWORK"))
 	if err != nil {
 		panic("Can't init BTC Wallet Monitor")
 	}
 
+	btcRelayingHeaderWorker := &workers.BTCRelayerV2{}
+	err = btcRelayingHeaderWorker.Init(3, "BTC Header Relayer", 60, os.Getenv("BTC_NETWORK"))
+	if err != nil {
+		panic("Can't init BTC Header Relayer")
+	}
+
 	listWorkers = append(listWorkers, btcBroadcastingManager)
 	listWorkers = append(listWorkers, btcWalletMonitorWorker)
+	listWorkers = append(listWorkers, btcRelayingHeaderWorker)
 
 	quitChan := make(chan os.Signal, 1)
 	signal.Notify(quitChan, syscall.SIGTERM)

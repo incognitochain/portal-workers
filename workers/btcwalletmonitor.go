@@ -3,7 +3,6 @@ package workers
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -66,7 +65,7 @@ func (b *BTCWalletMonitor) Init(id int, name string, freq int, network string) e
 	}
 
 	b.chainCfg = &chaincfg.TestNet3Params
-	if os.Getenv("BTC_NETWORK") == "main" {
+	if b.Network == "main" {
 		b.chainCfg = &chaincfg.MainNetParams
 	}
 
