@@ -66,7 +66,6 @@ func (b *BTCWalletMonitor) getLatestBTCBlockHashFromIncog() (uint64, error) {
 		return 0, err
 	}
 	if btcRelayingBestStateRes.RPCError != nil {
-		b.Logger.Errorf("getLatestBTCBlockHashFromIncog: call RPC error, %v\n", btcRelayingBestStateRes.RPCError.StackTrace)
 		return 0, errors.New(btcRelayingBestStateRes.RPCError.Message)
 	}
 

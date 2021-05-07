@@ -46,10 +46,11 @@ type ShieldingTxArrayObject struct {
 }
 
 func (b *BTCWalletMonitor) Init(id int, name string, freq int, network string) error {
-	err := b.WorkerAbs.Init(id, name, freq, network)
+	b.WorkerAbs.Init(id, name, freq, network)
 
 	b.Portal = go_incognito.NewPortal(b.Client)
 
+	var err error
 	// init leveldb instance
 	b.db, err = leveldb.OpenFile("db/walletmonitor", nil)
 	if err != nil {
