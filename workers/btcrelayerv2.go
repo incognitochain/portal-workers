@@ -66,7 +66,7 @@ func (b *BTCRelayerV2) relayBTCBlockToIncognito(
 	metadata := map[string]interface{}{
 		"SenderAddress": os.Getenv("INCOGNITO_PAYMENT_ADDRESS"),
 		"Header":        headerBlockStr,
-		"blockHeight":   fmt.Sprintf("%v", btcBlockHeight),
+		"BlockHeight":   fmt.Sprintf("%v", btcBlockHeight),
 	}
 
 	result, err := b.RelayingHeader.RelayBTCHeader(os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata)
