@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strconv"
 
+	"github.com/incognitochain/portal-workers/utils"
 	"github.com/joho/godotenv"
 )
 
@@ -25,9 +27,19 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	s := NewServer()
 
-	// split utxos before executing agents
+	// split utxos before executing workers
 	if os.Getenv("SPLITUTXO") == "true" {
-		// TODO: Split UTXO
+		privateKey := os.Getenv("INCOGNITO_PRIVATE_KEY")
+		paymentAddress := os.Getenv("INCOGNITO_PAYMENT_ADDRESS")
+		minNumUTXOsStr := os.Getenv("NUMUTXO")
+		minNumUTXOs, _ := strconv.Atoi(minNumUTXOsStr)
+		protocol := os.Getenv("INCOGNITO_PROTOCOL")
+		endpointUri := fmt.Sprintf("%v://%v:%v", os.Getenv("INCOGNITO_PROTOCOL"), os.Getenv("INCOGNITO_HOST"), os.Getenv("INCOGNITO_PORT"))
+
+		err := utils.SplitUTXOs(endpointUri, protocol, privateKey, paymentAddress, minNumUTXOs)
+		if err != nil {
+			panic("Could not split UTXOs")
+		}
 	}
 
 	s.Run()
