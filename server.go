@@ -20,36 +20,29 @@ func NewServer(workerIDs []int) *Server {
 	listWorkers := []workers.Worker{}
 	var err error
 
-	btcBroadcastingManager := &workers.BTCBroadcastingManager{}
-	err = btcBroadcastingManager.Init(1, "BTC Broadcasting Manager", 60, os.Getenv("BTC_NETWORK"))
-	if err != nil {
-		panic("Can't init BTC Broadcasting Manager")
-	}
-
-	btcWalletMonitorWorker := &workers.BTCWalletMonitor{}
-	err = btcWalletMonitorWorker.Init(2, "BTC Wallet Monitor", 60, os.Getenv("BTC_NETWORK"))
-	if err != nil {
-		panic("Can't init BTC Wallet Monitor")
-	}
-
-	btcRelayingHeaderWorker := &workers.BTCRelayerV2{}
-	err = btcRelayingHeaderWorker.Init(3, "BTC Header Relayer", 60, os.Getenv("BTC_NETWORK"))
-	if err != nil {
-		panic("Can't init BTC Header Relayer")
-	}
-
-	listWorkers = append(listWorkers, btcBroadcastingManager)
-	listWorkers = append(listWorkers, btcWalletMonitorWorker)
-	listWorkers = append(listWorkers, btcRelayingHeaderWorker)
-
-	excuteWorkers := []workers.Worker{}
-	for _, worker := range listWorkers {
-		for _, runWorkerID := range workerIDs {
-			if worker.GetID() == runWorkerID {
-				excuteWorkers = append(excuteWorkers, worker)
-				break
-			}
+	if contain(workerIDs, 1) {
+		btcBroadcastingManager := &workers.BTCBroadcastingManager{}
+		err = btcBroadcastingManager.Init(1, "BTC Broadcasting Manager", 60, os.Getenv("BTC_NETWORK"))
+		if err != nil {
+			panic("Can't init BTC Broadcasting Manager")
 		}
+		listWorkers = append(listWorkers, btcBroadcastingManager)
+	}
+	if contain(workerIDs, 2) {
+		btcWalletMonitorWorker := &workers.BTCWalletMonitor{}
+		err = btcWalletMonitorWorker.Init(2, "BTC Wallet Monitor", 60, os.Getenv("BTC_NETWORK"))
+		if err != nil {
+			panic("Can't init BTC Wallet Monitor")
+		}
+		listWorkers = append(listWorkers, btcWalletMonitorWorker)
+	}
+	if contain(workerIDs, 3) {
+		btcRelayingHeaderWorker := &workers.BTCRelayerV2{}
+		err = btcRelayingHeaderWorker.Init(3, "BTC Header Relayer", 60, os.Getenv("BTC_NETWORK"))
+		if err != nil {
+			panic("Can't init BTC Header Relayer")
+		}
+		listWorkers = append(listWorkers, btcRelayingHeaderWorker)
 	}
 
 	quitChan := make(chan os.Signal, 1)
@@ -57,7 +50,7 @@ func NewServer(workerIDs []int) *Server {
 	signal.Notify(quitChan, syscall.SIGINT)
 	return &Server{
 		quit:    quitChan,
-		finish:  make(chan bool, len(excuteWorkers)),
+		finish:  make(chan bool, len(listWorkers)),
 		workers: listWorkers,
 	}
 }
