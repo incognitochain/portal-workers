@@ -22,6 +22,7 @@ func main() {
 		}
 		workerIDs = append(workerIDs, one_int)
 	}
+	fmt.Printf("List of executed worker IDs: %+v\n", workerIDs)
 
 	err := godotenv.Load()
 	if err != nil {
