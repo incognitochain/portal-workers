@@ -16,7 +16,7 @@ type Server struct {
 	workers []workers.Worker
 }
 
-func NewServer() *Server {
+func NewServer(workerIDs []int) *Server {
 	listWorkers := []workers.Worker{}
 	var err error
 
@@ -42,12 +42,22 @@ func NewServer() *Server {
 	listWorkers = append(listWorkers, btcWalletMonitorWorker)
 	listWorkers = append(listWorkers, btcRelayingHeaderWorker)
 
+	excuteWorkers := []workers.Worker{}
+	for _, worker := range listWorkers {
+		for _, runWorkerID := range workerIDs {
+			if worker.GetID() == runWorkerID {
+				excuteWorkers = append(excuteWorkers, worker)
+				break
+			}
+		}
+	}
+
 	quitChan := make(chan os.Signal, 1)
 	signal.Notify(quitChan, syscall.SIGTERM)
 	signal.Notify(quitChan, syscall.SIGINT)
 	return &Server{
 		quit:    quitChan,
-		finish:  make(chan bool, len(listWorkers)),
+		finish:  make(chan bool, len(excuteWorkers)),
 		workers: listWorkers,
 	}
 }

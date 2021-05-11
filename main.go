@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"runtime"
@@ -11,6 +12,17 @@ import (
 )
 
 func main() {
+	flag.Parse()
+	tail := flag.Args()
+	workerIDs := []int{}
+	for _, str := range tail {
+		one_int, err := strconv.Atoi(str)
+		if err != nil {
+			panic("Worker ID is invalid")
+		}
+		workerIDs = append(workerIDs, one_int)
+	}
+
 	err := godotenv.Load()
 	if err != nil {
 		panic("Error loading .env file")
@@ -25,7 +37,7 @@ func main() {
 	fmt.Println("=========End============")
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	s := NewServer()
+	s := NewServer(workerIDs)
 
 	// split utxos before executing workers
 	if os.Getenv("SPLITUTXO") == "true" {

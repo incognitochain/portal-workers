@@ -46,7 +46,7 @@ func TestEstimateFee(t *testing.T) {
 	b := &BTCBroadcastingManager{}
 	// init bitcoin rpcclient
 	connCfg := &rpcclient.ConnConfig{
-		Host:         fmt.Sprintf("%s:%s", "185.254.97.164", "18443"),
+		Host:         fmt.Sprintf("%s:%s", "51.161.119.66", "18443"),
 		User:         "thach",
 		Pass:         "deptrai",
 		HTTPPostMode: true, // Bitcoin core only supports HTTP POST mode

@@ -27,6 +27,7 @@ type Worker interface {
 	Execute()
 	ExportErrorLog(msg string)
 	ExportInfoLog(msg string)
+	GetID() int
 	GetName() string
 	GetFrequency() int
 	GetQuitChan() chan bool
@@ -72,6 +73,10 @@ func (a *WorkerAbs) ExportErrorLog(msg string) {
 func (a *WorkerAbs) ExportInfoLog(msg string) {
 	a.Logger.Info(msg)
 	utils.SendSlackNotification(fmt.Sprintf("[INF] %v", msg))
+}
+
+func (a *WorkerAbs) GetID() int {
+	return a.ID
 }
 
 func (a *WorkerAbs) GetName() string {
