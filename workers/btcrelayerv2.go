@@ -113,7 +113,7 @@ func (b *BTCRelayerV2) getLatestBTCBlockHashFromIncog(btcClient *rpcclient.Clien
 	if blkHash.String() != currentBTCBlkHashStr { // fork detected
 		msg := fmt.Sprintf("There was a fork happened at block %d, stepping back %d blocks now...", currentBTCBlkHeight, BlockStepBacks)
 		b.Logger.Warnf(msg)
-		utils.SendSlackNotification(msg)
+		utils.SendSlackNotification(msg, utils.ALERT_NOTIFICATION)
 		return currentBTCBlkHeight - BlockStepBacks, nil
 	}
 	return currentBTCBlkHeight, nil
