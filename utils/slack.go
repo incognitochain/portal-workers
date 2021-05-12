@@ -9,14 +9,27 @@ import (
 	"time"
 )
 
+const (
+	ALERT_NOTIFICATION = 0
+	INFO_NOTIFICATION  = 1
+)
+
 type SlackRequestBody struct {
 	Text string `json:"text"`
 }
 
 // SendSlackNotification will post to an 'Incoming Webook' url setup in Slack Apps. It accepts
 // some text and the slack channel is saved within Slack.
-func SendSlackNotification(msg string) error {
-	webhookURL := os.Getenv("WEBHOOK_URL")
+func SendSlackNotification(msg string, notiType int) error {
+	var webhookURL string
+	if notiType == ALERT_NOTIFICATION {
+		webhookURL = os.Getenv("ALERT_WEBHOOK_URL")
+	} else if notiType == INFO_NOTIFICATION {
+		webhookURL = os.Getenv("INFO_WEBHOOK_URL")
+	} else {
+		return errors.New("Notification type is not supported")
+	}
+
 	slackBody, _ := json.Marshal(SlackRequestBody{Text: msg})
 	req, err := http.NewRequest(http.MethodPost, webhookURL, bytes.NewBuffer(slackBody))
 	if err != nil {
