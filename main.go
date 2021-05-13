@@ -6,18 +6,21 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/incognitochain/portal-workers/utils"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	var envFile string
-	flag.StringVar(&envFile, "config", ".env", ".env config file")
+	var envFile, workersStr string
+	flag.StringVar(&envFile, "config", ".env_dev", ".env config file")
+	flag.StringVar(&workersStr, "workers", "1,2,3", "Excuted worker IDs")
 	flag.Parse()
-	tail := flag.Args()
+
+	workerIDsStr := strings.Split(workersStr, ",")
 	workerIDs := []int{}
-	for _, str := range tail {
+	for _, str := range workerIDsStr {
 		one_int, err := strconv.Atoi(str)
 		if err != nil {
 			panic("Worker ID is invalid")
