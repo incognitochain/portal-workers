@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	go_incognito "github.com/inc-backend/go-incognito"
@@ -16,13 +17,13 @@ func SplitUTXOs(endpointUri string, protocol string, privateKey string, paymentA
 	publicIncognito := go_incognito.NewPublicIncognito(
 		&http.Client{},
 		endpointUri,
-		"",
+		os.Getenv("INCOGNITO_COINSERVICE_URL"),
 		2,
 	)
 	blockInfo := go_incognito.NewBlockInfo(publicIncognito)
 	wallet := go_incognito.NewWallet(publicIncognito, blockInfo)
 
-	rpcClient := httpclient.NewHttpClient(endpointUri, "", protocol, endpointUri, 0)
+	rpcClient := httpclient.NewHttpClient(endpointUri, os.Getenv("INCOGNITO_COINSERVICE_URL"), protocol, endpointUri, 0)
 	senderKeySet, _, err := privatekey.GetKeySetFromPrivateKeyParams(privateKey)
 	if err != nil {
 		return err
