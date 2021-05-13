@@ -1,3 +1,5 @@
 portal_workers
 logs
 db
+.env_test
+.env_main

@@ -12,6 +12,8 @@ import (
 )
 
 func main() {
+	var envFile string
+	flag.StringVar(&envFile, "config", ".env", ".env config file")
 	flag.Parse()
 	tail := flag.Args()
 	workerIDs := []int{}
@@ -24,13 +26,13 @@ func main() {
 	}
 	fmt.Printf("List of executed worker IDs: %+v\n", workerIDs)
 
-	err := godotenv.Load()
+	err := godotenv.Load(envFile)
 	if err != nil {
-		panic("Error loading .env file")
+		panic(fmt.Sprintf("Error loading %v file", envFile))
 	}
 
 	var myEnv map[string]string
-	myEnv, _ = godotenv.Read()
+	myEnv, _ = godotenv.Read(envFile)
 	fmt.Println("=========Config============")
 	for key, value := range myEnv {
 		fmt.Println(key + ": " + value)
