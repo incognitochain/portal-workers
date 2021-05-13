@@ -50,7 +50,7 @@ func SplitUTXOs(endpointUri string, protocol string, privateKey string, paymentA
 		}
 		avgValue := sumValue / uint64(len(plainCoinsInput))
 
-		fmt.Printf("Number of current coins: %v, Min Value: %v\n", len(plainCoinsInput), avgValue)
+		fmt.Printf("Number of current coins: %v, Avg. Value: %v\n", len(plainCoinsInput), avgValue)
 		if avgValue < 10000 {
 			return fmt.Errorf("Value of outcoins are too small")
 		}

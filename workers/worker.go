@@ -46,8 +46,7 @@ func (a *WorkerAbs) Init(id int, name string, freq int, network string) error {
 	publicIncognito := go_incognito.NewPublicIncognito(
 		client,
 		fmt.Sprintf("%v://%v:%v", os.Getenv("INCOGNITO_PROTOCOL"), os.Getenv("INCOGNITO_HOST"), os.Getenv("INCOGNITO_PORT")),
-		"",
-		//CoinServiceTest,
+		os.Getenv("INCOGNITO_COINSERVICE_URL"),
 		2,
 	)
 	a.Client = publicIncognito
