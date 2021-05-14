@@ -67,6 +67,8 @@ func (b *BTCWalletMonitor) Init(id int, name string, freq int, network string) e
 	b.chainCfg = &chaincfg.TestNet3Params
 	if b.Network == "main" {
 		b.chainCfg = &chaincfg.MainNetParams
+	} else if b.Network == "reg" {
+		b.chainCfg = &chaincfg.RegressionNetParams
 	}
 
 	return nil
