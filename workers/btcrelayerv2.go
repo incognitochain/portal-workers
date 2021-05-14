@@ -84,6 +84,7 @@ func (b *BTCRelayerV2) relayBTCBlockToIncognito(
 	}
 
 	b.ExportInfoLog(fmt.Sprintf("relayBTCBlockToIncognito success (%d) with TxID: %v\n", btcBlockHeight, txID))
+	fmt.Printf("Relaying block %v, TxID: %v\n", btcBlockHeight, txID)
 	return nil
 }
 
