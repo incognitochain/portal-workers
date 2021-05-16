@@ -138,8 +138,8 @@ func (b *BTCBroadcastingManager) getLatestBTCBlockHashFromIncog() (uint64, error
 	return uint64(currentBTCBlkHeight), nil
 }
 
-func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchIDs map[string]bool, height uint64, curIncBlkHeight uint64) (map[string]*BroadcastTx, error) {
-	txArray := map[string]*BroadcastTx{}
+func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchIDs map[string]bool, height uint64, curIncBlkHeight uint64) (map[string][]*BroadcastTx, error) {
+	txArray := map[string][]*BroadcastTx{}
 	var params []interface{}
 
 	params = []interface{}{
@@ -184,7 +184,7 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchI
 
 			feePerRequest, numberRequest := b.getUnshieldFeeInfo(batch)
 			acceptableFee := utils.IsEnoughFee(vsize, feePerRequest, numberRequest, b.bitcoinFee)
-			txArray[batch.BatchID] = &BroadcastTx{
+			txArray[batch.BatchID] = []*BroadcastTx{{
 				TxContent:     btcTxContent,
 				TxHash:        btcTxHash,
 				VSize:         vsize,
@@ -192,15 +192,16 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchI
 				NumOfRequests: numberRequest,
 				IsBroadcasted: acceptableFee,
 				BlkHeight:     curIncBlkHeight,
+			},
 			}
 		}
 	}
 	return txArray, nil
 }
 
-func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray map[string]*FeeReplacementTx, curIncBlkHeight uint64) (map[string]*FeeReplacementTx, map[string]*BroadcastTx, error) {
+func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray map[string]*FeeReplacementTx, curIncBlkHeight uint64) (map[string]*FeeReplacementTx, map[string][]*BroadcastTx, error) {
 	var params []interface{}
-	txArray := map[string]*BroadcastTx{}
+	txArray := map[string][]*BroadcastTx{}
 
 	for batchID, tx := range feeReplacementTxArray {
 		acceptableFee := utils.IsEnoughFee(tx.VSize, tx.FeePerRequest, tx.NumOfRequests, b.bitcoinFee)
@@ -223,7 +224,7 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 			btcTxContent := signedRawTxRes.Result.SignedTx
 			btcTxHash := signedRawTxRes.Result.TxID
 
-			txArray[batchID] = &BroadcastTx{
+			txArray[batchID] = []*BroadcastTx{{
 				TxContent:     btcTxContent,
 				TxHash:        btcTxHash,
 				VSize:         tx.VSize,
@@ -231,9 +232,10 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 				NumOfRequests: tx.NumOfRequests,
 				IsBroadcasted: true,
 				BlkHeight:     curIncBlkHeight,
+			},
 			}
 		} else {
-			txArray[batchID] = &BroadcastTx{
+			txArray[batchID] = []*BroadcastTx{{
 				TxContent:     "",
 				TxHash:        "",
 				VSize:         tx.VSize,
@@ -241,6 +243,7 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 				NumOfRequests: tx.NumOfRequests,
 				IsBroadcasted: false,
 				BlkHeight:     curIncBlkHeight,
+			},
 			}
 		}
 
@@ -346,13 +349,31 @@ func (b *BTCBroadcastingManager) getRequestFeeReplacementTxStatus(txID string) (
 	}
 }
 
-func joinTxArray(array1 map[string]*BroadcastTx, array2 map[string]*BroadcastTx) map[string]*BroadcastTx {
-	joinedArray := map[string]*BroadcastTx{}
+func joinTxArray(array1 map[string][]*BroadcastTx, array2 map[string][]*BroadcastTx) map[string][]*BroadcastTx {
+	joinedArray := map[string][]*BroadcastTx{}
 	for batchID, value := range array1 {
-		joinedArray[batchID] = value
+		_, exist := joinedArray[batchID]
+		if !exist {
+			joinedArray[batchID] = []*BroadcastTx{}
+		}
+		joinedArray[batchID] = append(joinedArray[batchID], value...)
 	}
 	for batchID, value := range array2 {
-		joinedArray[batchID] = value
+		_, exist := joinedArray[batchID]
+		if !exist {
+			joinedArray[batchID] = []*BroadcastTx{}
+		}
+		joinedArray[batchID] = append(joinedArray[batchID], value...)
 	}
 	return joinedArray
+}
+
+func getLastestBroadcastTx(txArray []*BroadcastTx) *BroadcastTx {
+	lastestTx := txArray[0]
+	for idx := 1; idx < len(txArray); idx++ {
+		if txArray[idx].BlkHeight > lastestTx.BlkHeight {
+			lastestTx = txArray[idx]
+		}
+	}
+	return lastestTx
 }

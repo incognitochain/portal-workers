@@ -49,7 +49,7 @@ type ConfirmedTx struct {
 }
 
 type BroadcastTxArrayObject struct {
-	TxArray               map[string]*BroadcastTx
+	TxArray               map[string][]*BroadcastTx
 	FeeReplacementTxArray map[string]*FeeReplacementTx
 	ConfirmedTxArray      map[string]*ConfirmedTx
 	NextBlkHeight         uint64 // height of the next block need to scan in Inc chain
@@ -95,7 +95,7 @@ func (b *BTCBroadcastingManager) Execute() {
 	defer b.db.Close()
 
 	nextBlkHeight := uint64(FirstBroadcastTxBlockHeight)
-	broadcastTxArray := map[string]*BroadcastTx{}           // key: batchID
+	broadcastTxArray := map[string][]*BroadcastTx{}         // key: batchID
 	feeReplacementTxArray := map[string]*FeeReplacementTx{} // key: batchID
 	confirmedTxArray := map[string]*ConfirmedTx{}           // key: batchID
 
@@ -165,8 +165,8 @@ func (b *BTCBroadcastingManager) Execute() {
 			processedBatchIDs[batchID] = true
 		}
 
-		var tempBroadcastTxArray1 map[string]*BroadcastTx
-		var tempBroadcastTxArray2 map[string]*BroadcastTx
+		var tempBroadcastTxArray1 map[string][]*BroadcastTx
+		var tempBroadcastTxArray2 map[string][]*BroadcastTx
 		tempBroadcastTxArray1, err = b.getBroadcastTxsFromBeaconHeight(processedBatchIDs, nextBlkHeight+IncBlockBatchSize-1, curIncBlkHeight)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve Incognito block - with err: %v", err))
@@ -180,16 +180,18 @@ func (b *BTCBroadcastingManager) Execute() {
 
 		tempBroadcastTxArray := joinTxArray(tempBroadcastTxArray1, tempBroadcastTxArray2)
 
-		for batchID, tx := range tempBroadcastTxArray {
-			if tx.IsBroadcasted {
-				fmt.Printf("Broadcast tx for batch %v, content %v \n", batchID, tx.TxContent)
-				err := b.broadcastTx(tx.TxContent)
-				if err != nil {
-					b.ExportErrorLog(fmt.Sprintf("Could not broadcast tx %v - with err: %v", tx.TxHash, err))
-					continue
+		for batchID, txArray := range tempBroadcastTxArray {
+			for _, tx := range txArray {
+				if tx.IsBroadcasted {
+					fmt.Printf("Broadcast tx for batch %v, content %v \n", batchID, tx.TxContent)
+					err := b.broadcastTx(tx.TxContent)
+					if err != nil {
+						b.ExportErrorLog(fmt.Sprintf("Could not broadcast tx %v - with err: %v", tx.TxHash, err))
+						continue
+					}
+				} else {
+					fmt.Printf("Does not broadcast tx for batch %v has fee %v is not enough\n", batchID, tx.FeePerRequest)
 				}
-			} else {
-				fmt.Printf("Does not broadcast tx for batch %v has fee %v is not enough\n", batchID, tx.FeePerRequest)
 			}
 		}
 		broadcastTxArray = joinTxArray(broadcastTxArray, tempBroadcastTxArray)
@@ -204,47 +206,49 @@ func (b *BTCBroadcastingManager) Execute() {
 		var wg sync.WaitGroup
 
 		confirmedBatchIDChan := make(chan map[string]*ConfirmedTx, len(broadcastTxArray))
-		for batchID, tx := range broadcastTxArray {
-			if tx.IsBroadcasted {
-				curBatchID := batchID
-				curTx := tx
+		for batchID, txArray := range broadcastTxArray {
+			for _, tx := range txArray {
+				if tx.IsBroadcasted {
+					curBatchID := batchID
+					curTx := tx
 
-				isConfirmed, btcBlockHeight := b.isConfirmedBTCTx(curTx.TxHash)
+					isConfirmed, btcBlockHeight := b.isConfirmedBTCTx(curTx.TxHash)
 
-				if isConfirmed && btcBlockHeight+BTCConfirmationThreshold <= relayingBTCHeight {
-					fmt.Printf("BTC Tx %v is confirmed\n", curTx.TxHash)
-					// generate BTC proof
-					btcProof, err := utils.BuildProof(b.btcClient, curTx.TxHash, btcBlockHeight)
-					if err != nil {
-						b.ExportErrorLog(fmt.Sprintf("Could not generate BTC proof for batch %v - with err: %v", curBatchID, err))
-						continue
-					}
-
-					// submit confirmed tx
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
-						txID, err := b.submitConfirmedTx(btcProof, curBatchID)
+					if isConfirmed && btcBlockHeight+BTCConfirmationThreshold <= relayingBTCHeight {
+						fmt.Printf("BTC Tx %v is confirmed\n", curTx.TxHash)
+						// generate BTC proof
+						btcProof, err := utils.BuildProof(b.btcClient, curTx.TxHash, btcBlockHeight)
 						if err != nil {
-							b.ExportErrorLog(fmt.Sprintf("Could not submit confirmed tx for batch %v - with err: %v", curBatchID, err))
-							return
+							b.ExportErrorLog(fmt.Sprintf("Could not generate BTC proof for batch %v - with err: %v", curBatchID, err))
+							continue
 						}
-						status, err := b.getSubmitConfirmedTxStatus(txID)
-						if err != nil {
-							b.ExportErrorLog(fmt.Sprintf("Could not get submit confirmed tx status for batch %v, txID %v - with err: %v", curBatchID, txID, err))
-						} else {
-							if status == 0 { // rejected
-								b.ExportErrorLog(fmt.Sprintf("Send confirmation failed for batch %v, txID %v", curBatchID, txID))
+
+						// submit confirmed tx
+						wg.Add(1)
+						go func() {
+							defer wg.Done()
+							txID, err := b.submitConfirmedTx(btcProof, curBatchID)
+							if err != nil {
+								b.ExportErrorLog(fmt.Sprintf("Could not submit confirmed tx for batch %v - with err: %v", curBatchID, err))
+								return
+							}
+							status, err := b.getSubmitConfirmedTxStatus(txID)
+							if err != nil {
+								b.ExportErrorLog(fmt.Sprintf("Could not get submit confirmed tx status for batch %v, txID %v - with err: %v", curBatchID, txID, err))
 							} else {
-								b.ExportInfoLog(fmt.Sprintf("Send confirmation succeed for batch %v, txID %v", curBatchID, txID))
+								if status == 0 { // rejected
+									b.ExportErrorLog(fmt.Sprintf("Send confirmation failed for batch %v, txID %v", curBatchID, txID))
+								} else {
+									b.ExportInfoLog(fmt.Sprintf("Send confirmation succeed for batch %v, txID %v", curBatchID, txID))
+								}
+								confirmedBatchIDChan <- map[string]*ConfirmedTx{
+									curBatchID: {
+										BlkHeight: curIncBlkHeight,
+									},
+								}
 							}
-							confirmedBatchIDChan <- map[string]*ConfirmedTx{
-								curBatchID: {
-									BlkHeight: curIncBlkHeight,
-								},
-							}
-						}
-					}()
+						}()
+					}
 				}
 			}
 		}
@@ -260,7 +264,8 @@ func (b *BTCBroadcastingManager) Execute() {
 
 		// check if waiting too long -> send rpc to notify the Inc chain for fee replacement
 		replacedBatchIDChan := make(chan map[string]*FeeReplacementTx, len(broadcastTxArray))
-		for batchID, tx := range broadcastTxArray {
+		for batchID, txArray := range broadcastTxArray {
+			tx := getLastestBroadcastTx(txArray)
 			curBatchID := batchID
 			curTx := tx
 
