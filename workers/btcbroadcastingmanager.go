@@ -310,7 +310,6 @@ func (b *BTCBroadcastingManager) Execute() {
 		for batch := range replacedBatchIDChan {
 			for batchID, tx := range batch {
 				feeReplacementTxArray[batchID] = tx
-				delete(broadcastTxArray, batchID)
 			}
 		}
 
