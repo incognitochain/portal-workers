@@ -227,16 +227,16 @@ func (b *BTCBroadcastingManager) Execute() {
 							b.ExportErrorLog(fmt.Sprintf("Could not generate BTC proof for batch %v - with err: %v", curBatchID, err))
 							continue
 						}
+						txID, err := b.submitConfirmedTx(btcProof, curBatchID)
+						if err != nil {
+							b.ExportErrorLog(fmt.Sprintf("Could not submit confirmed tx for batch %v - with err: %v", curBatchID, err))
+							return
+						}
 
 						// submit confirmed tx
 						wg.Add(1)
 						go func() {
 							defer wg.Done()
-							txID, err := b.submitConfirmedTx(btcProof, curBatchID)
-							if err != nil {
-								b.ExportErrorLog(fmt.Sprintf("Could not submit confirmed tx for batch %v - with err: %v", curBatchID, err))
-								return
-							}
 							status, err := b.getSubmitConfirmedTxStatus(txID)
 							if err != nil {
 								b.ExportErrorLog(fmt.Sprintf("Could not get submit confirmed tx status for batch %v, txID %v - with err: %v", curBatchID, txID, err))
@@ -278,14 +278,15 @@ func (b *BTCBroadcastingManager) Execute() {
 				newFee := utils.GetNewFee(curTx.VSize, curTx.FeePerRequest, curTx.NumOfRequests, b.bitcoinFee)
 				fmt.Printf("Old fee %v, request new fee %v for batchID %v\n", curTx.FeePerRequest, newFee, curBatchID)
 				// notify the Inc chain for fee replacement
+				txID, err := b.requestFeeReplacement(curBatchID, newFee)
+				if err != nil {
+					b.ExportErrorLog(fmt.Sprintf("Could not request RBF for batch %v - with err: %v", curBatchID, err))
+					return
+				}
+
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					txID, err := b.requestFeeReplacement(curBatchID, newFee)
-					if err != nil {
-						b.ExportErrorLog(fmt.Sprintf("Could not request RBF for batch %v - with err: %v", curBatchID, err))
-						return
-					}
 					status, err := b.getRequestFeeReplacementTxStatus(txID)
 					if err != nil {
 						b.ExportErrorLog(fmt.Sprintf("Could not request RBF tx status for batch %v, txID %v - with err: %v", curBatchID, txID, err))

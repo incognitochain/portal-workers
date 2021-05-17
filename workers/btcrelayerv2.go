@@ -161,20 +161,15 @@ func (b *BTCRelayerV2) Execute() {
 		wg.Wait()
 
 		for i := nextBlkHeight; i < nextBlkHeight+BTCBlockBatchSize; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				btcBlkRes := <-blockQueue
-				if btcBlkRes.err != nil {
-					relayingResQueue <- btcBlkRes.err
-				} else {
-					//relay next BTC block to Incognito
-					err := b.relayBTCBlockToIncognito(btcBlkRes.blockHeight, btcBlkRes.msgBlock)
-					relayingResQueue <- err
-				}
-			}()
+			btcBlkRes := <-blockQueue
+			if btcBlkRes.err != nil {
+				relayingResQueue <- btcBlkRes.err
+			} else {
+				//relay next BTC block to Incognito
+				err := b.relayBTCBlockToIncognito(btcBlkRes.blockHeight, btcBlkRes.msgBlock)
+				relayingResQueue <- err
+			}
 		}
-		wg.Wait()
 
 		for i := nextBlkHeight; i < nextBlkHeight+BTCBlockBatchSize; i++ {
 			relayingErr := <-relayingResQueue
