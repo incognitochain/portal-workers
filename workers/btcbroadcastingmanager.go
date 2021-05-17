@@ -205,7 +205,12 @@ func (b *BTCBroadcastingManager) Execute() {
 
 		var wg sync.WaitGroup
 
-		confirmedBatchIDChan := make(chan map[string]*ConfirmedTx, len(broadcastTxArray))
+		maxLenChan := 0
+		for _, txArray := range broadcastTxArray {
+			maxLenChan += len(txArray)
+		}
+		confirmedBatchIDChan := make(chan map[string]*ConfirmedTx, maxLenChan)
+
 		for batchID, txArray := range broadcastTxArray {
 			for _, tx := range txArray {
 				if tx.IsBroadcasted {
