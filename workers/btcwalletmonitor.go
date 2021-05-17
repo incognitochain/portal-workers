@@ -204,7 +204,7 @@ func (b *BTCWalletMonitor) Execute() {
 		sentShieldingRequest := make(chan string, len(waitingShieldingList))
 		var wg sync.WaitGroup
 		for txHash, value := range waitingShieldingList {
-			if value.BTCBlockHeight+BTCConfirmationThreshold <= relayingBTCHeight {
+			if value.BTCBlockHeight+BTCConfirmationThreshold-1 <= relayingBTCHeight {
 				// send RPC
 				txID, err := b.submitShieldingRequest(value.IncAddress, value.Proof)
 				if err != nil {
