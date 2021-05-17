@@ -61,12 +61,6 @@ func (b *BTCBroadcastingManager) Init(id int, name string, freq int, network str
 	b.Portal = go_incognito.NewPortal(b.Client)
 
 	var err error
-	// init leveldb instance
-	b.db, err = leveldb.OpenFile("db/broadcastingmanager", nil)
-	if err != nil {
-		b.ExportErrorLog(fmt.Sprintf("Could not open leveldb storage file - with err: %v", err))
-		return err
-	}
 
 	// init bitcoin rpcclient
 	b.btcClient, err = utils.BuildBTCClient()
@@ -92,6 +86,13 @@ func (b *BTCBroadcastingManager) ExportInfoLog(msg string) {
 // - Check a broadcasted Bitcoin transaction confirmation and notify the Incognito chain
 func (b *BTCBroadcastingManager) Execute() {
 	b.Logger.Info("BTCBroadcastingManager worker is executing...")
+	// init leveldb instance
+	var err error
+	b.db, err = leveldb.OpenFile("db/broadcastingmanager", nil)
+	if err != nil {
+		b.ExportErrorLog(fmt.Sprintf("Could not open leveldb storage file - with err: %v", err))
+		return
+	}
 	defer b.db.Close()
 
 	nextBlkHeight := uint64(FirstBroadcastTxBlockHeight)

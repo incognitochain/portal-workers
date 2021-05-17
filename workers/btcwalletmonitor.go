@@ -50,12 +50,6 @@ func (b *BTCWalletMonitor) Init(id int, name string, freq int, network string) e
 	b.Portal = go_incognito.NewPortal(b.Client)
 
 	var err error
-	// init leveldb instance
-	b.db, err = leveldb.OpenFile("db/walletmonitor", nil)
-	if err != nil {
-		b.ExportErrorLog(fmt.Sprintf("Could not open leveldb storage file - with err: %v", err))
-		return err
-	}
 
 	// init bitcoin rpcclient
 	b.btcClient, err = utils.BuildBTCClient()
@@ -87,6 +81,13 @@ func (b *BTCWalletMonitor) ExportInfoLog(msg string) {
 // - Send shielding request on behalf of users to Incognito chain
 func (b *BTCWalletMonitor) Execute() {
 	b.Logger.Info("BTCWalletMonitor worker is executing...")
+	// init leveldb instance
+	var err error
+	b.db, err = leveldb.OpenFile("db/walletmonitor", nil)
+	if err != nil {
+		b.ExportErrorLog(fmt.Sprintf("Could not open leveldb storage file - with err: %v", err))
+		return
+	}
 	defer b.db.Close()
 
 	shieldingMonitoringList := []*ShieldingMonitoringInfo{}
