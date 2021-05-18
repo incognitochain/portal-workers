@@ -19,11 +19,10 @@ import (
 	"github.com/inc-backend/go-incognito/publish/transformer"
 )
 
-// BTCBlockBatchSize is BTC block batch size
-const BTCBlockBatchSize = 1
-
-// BlockStepBacks is number of blocks that the job needs to step back to solve fork situation
-const BlockStepBacks = 8
+const (
+	BTCBlockBatchSize = 1 // BTCBlockBatchSize is BTC block batch size
+	BlockStepBacks    = 8 // BlockStepBacks is number of blocks that the job needs to step back to solve fork situation
+)
 
 type btcBlockRes struct {
 	msgBlock    *wire.MsgBlock

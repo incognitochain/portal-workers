@@ -12,11 +12,15 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-const InitIncBlockBatchSize = 1000
-const FirstBroadcastTxBlockHeight = 1
-const TimeoutBTCFeeReplacement = 200
-const TimeIntervalBTCFeeReplacement = 50
-const ProcessedBlkCacheDepth = 10000
+const (
+	InitIncBlockBatchSize           = 1000
+	FirstBroadcastTxBlockHeight     = 1
+	TimeoutBTCFeeReplacement        = 200
+	TimeIntervalBTCFeeReplacement   = 50
+	ProcessedBlkCacheDepth          = 10000
+	BroadcastingManagerDBFileDir    = "db/broadcastingmanager"
+	BroadcastingManagerDBObjectName = "BTCBroadcast-LastUpdate"
+)
 
 type BTCBroadcastingManager struct {
 	WorkerAbs
@@ -88,7 +92,7 @@ func (b *BTCBroadcastingManager) Execute() {
 	b.Logger.Info("BTCBroadcastingManager worker is executing...")
 	// init leveldb instance
 	var err error
-	b.db, err = leveldb.OpenFile("db/broadcastingmanager", nil)
+	b.db, err = leveldb.OpenFile(BroadcastingManagerDBFileDir, nil)
 	if err != nil {
 		b.ExportErrorLog(fmt.Sprintf("Could not open leveldb storage file - with err: %v", err))
 		return
@@ -101,7 +105,7 @@ func (b *BTCBroadcastingManager) Execute() {
 	confirmedTxArray := map[string]*ConfirmedTx{}           // key: batchID
 
 	// restore from db
-	lastUpdateBytes, err := b.db.Get([]byte("BTCBroadcast-LastUpdate"), nil)
+	lastUpdateBytes, err := b.db.Get([]byte(BroadcastingManagerDBObjectName), nil)
 	if err == nil {
 		var broadcastTxsDBObject *BroadcastTxArrayObject
 		json.Unmarshal(lastUpdateBytes, &broadcastTxsDBObject)
@@ -329,7 +333,7 @@ func (b *BTCBroadcastingManager) Execute() {
 			FeeReplacementTxArray: feeReplacementTxArray,
 			NextBlkHeight:         nextBlkHeight,
 		})
-		err = b.db.Put([]byte("BTCBroadcast-LastUpdate"), BroadcastTxArrayObjectBytes, nil)
+		err = b.db.Put([]byte(BroadcastingManagerDBObjectName), BroadcastTxArrayObjectBytes, nil)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not save object to db - with err: %v", err))
 			return

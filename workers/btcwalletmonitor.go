@@ -15,7 +15,11 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-const TimeoutTrackingInstanceInSecond = int64(365 * 24 * 60 * 60)
+const (
+	TimeoutTrackingInstanceInSecond = int64(365 * 24 * 60 * 60)
+	WalletMonitorDBFileDir          = "db/walletmonitor"
+	WalletMonitorDBObjectName       = "BTCMonitor-LastUpdate"
+)
 
 type BTCWalletMonitor struct {
 	WorkerAbs
@@ -83,7 +87,7 @@ func (b *BTCWalletMonitor) Execute() {
 	b.Logger.Info("BTCWalletMonitor worker is executing...")
 	// init leveldb instance
 	var err error
-	b.db, err = leveldb.OpenFile("db/walletmonitor", nil)
+	b.db, err = leveldb.OpenFile(WalletMonitorDBFileDir, nil)
 	if err != nil {
 		b.ExportErrorLog(fmt.Sprintf("Could not open leveldb storage file - with err: %v", err))
 		return
@@ -95,7 +99,7 @@ func (b *BTCWalletMonitor) Execute() {
 	lastTimeUpdated := int64(0)
 
 	// restore data from db
-	lastUpdateBytes, err := b.db.Get([]byte("BTCMonitor-LastUpdate"), nil)
+	lastUpdateBytes, err := b.db.Get([]byte(WalletMonitorDBObjectName), nil)
 	if err == nil {
 		var shieldingTxArrayObject *ShieldingTxArrayObject
 		json.Unmarshal(lastUpdateBytes, &shieldingTxArrayObject)
@@ -246,7 +250,7 @@ func (b *BTCWalletMonitor) Execute() {
 			WaitingShieldingList:    waitingShieldingList,
 			LastTimeStampUpdated:    lastTimeUpdated,
 		})
-		err = b.db.Put([]byte("BTCMonitor-LastUpdate"), shieldingTxArrayObjectBytes, nil)
+		err = b.db.Put([]byte(WalletMonitorDBObjectName), shieldingTxArrayObjectBytes, nil)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not save object to db - with err: %v", err))
 			return
