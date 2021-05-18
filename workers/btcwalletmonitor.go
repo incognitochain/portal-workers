@@ -104,7 +104,7 @@ func (b *BTCWalletMonitor) Execute() {
 		lastTimeUpdated = shieldingTxArrayObject.LastTimeStampUpdated
 	}
 
-	trackingBTCAddress := []btcutil.Address{}
+	trackingBTCAddresses := []btcutil.Address{}
 	btcAddressIndexMapping := map[string]int{}
 	for idx, instance := range shieldingMonitoringList {
 		address, err := btcutil.DecodeAddress(instance.BTCAddress, b.chainCfg)
@@ -112,7 +112,7 @@ func (b *BTCWalletMonitor) Execute() {
 			b.ExportErrorLog(fmt.Sprintf("Could not decode address %v - with err: %v", instance.BTCAddress, err))
 			continue
 		}
-		trackingBTCAddress = append(trackingBTCAddress, address)
+		trackingBTCAddresses = append(trackingBTCAddresses, address)
 		btcAddressIndexMapping[instance.BTCAddress] = idx
 	}
 
@@ -148,11 +148,14 @@ func (b *BTCWalletMonitor) Execute() {
 			}
 
 			shieldingMonitoringList = append(shieldingMonitoringList, instance)
-			trackingBTCAddress = append(trackingBTCAddress, address)
+			trackingBTCAddresses = append(trackingBTCAddresses, address)
 			btcAddressIndexMapping[instance.BTCAddress] = idx
 		}
 
-		listUnspentResults, err := b.btcClient.ListUnspentMinMaxAddresses(BTCConfirmationThreshold, 99999999, trackingBTCAddress)
+		if len(trackingBTCAddresses) == 0 {
+			continue
+		}
+		listUnspentResults, err := b.btcClient.ListUnspentMinMaxAddresses(BTCConfirmationThreshold, 99999999, trackingBTCAddresses)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not scan list of unspent outcoins - with err: %v", err))
 			continue
