@@ -157,6 +157,7 @@ func (b *BTCWalletMonitor) Execute() {
 		}
 
 		if len(trackingBTCAddresses) == 0 {
+			time.Sleep(15 * time.Second)
 			continue
 		}
 		listUnspentResults, err := b.btcClient.ListUnspentMinMaxAddresses(BTCConfirmationThreshold, 99999999, trackingBTCAddresses)
