@@ -84,7 +84,7 @@ func SplitUTXOs(endpointUri string, protocol string, privateKey string, paymentA
 		}
 
 		cntLoop++
-		if cntLoop <= MaxLoopTime {
+		if cntLoop >= MaxLoopTime {
 			break
 		}
 
