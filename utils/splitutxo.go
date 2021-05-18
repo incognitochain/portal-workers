@@ -13,6 +13,11 @@ import (
 	"github.com/inc-backend/go-incognito/src/services"
 )
 
+const (
+	MaxLoopTime = 100
+	PRVIDStr    = "0000000000000000000000000000000000000000000000000000000000000004"
+)
+
 func SplitUTXOs(endpointUri string, protocol string, privateKey string, paymentAddress string, minNumUTXOs int) error {
 	publicIncognito := go_incognito.NewPublicIncognito(
 		&http.Client{},
@@ -29,8 +34,7 @@ func SplitUTXOs(endpointUri string, protocol string, privateKey string, paymentA
 		return err
 	}
 
-	PRVIDStr := "0000000000000000000000000000000000000000000000000000000000000004"
-	MAX_LOOP_TIME := 100
+	cntLoop := 0
 
 	for {
 		plainCoinsInput, _, err := services.GetListUTXO(rpcClient, PRVIDStr, senderKeySet, 2, true)
@@ -79,8 +83,8 @@ func SplitUTXOs(endpointUri string, protocol string, privateKey string, paymentA
 			fmt.Printf("TxID: %+v\n", txID)
 		}
 
-		MAX_LOOP_TIME--
-		if MAX_LOOP_TIME == 0 {
+		cntLoop++
+		if cntLoop <= MaxLoopTime {
 			break
 		}
 

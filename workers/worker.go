@@ -66,12 +66,12 @@ func (a *WorkerAbs) Execute() {
 
 func (a *WorkerAbs) ExportErrorLog(msg string) {
 	a.Logger.Error(msg)
-	utils.SendSlackNotification(fmt.Sprintf("[ERR] %v", msg), utils.ALERT_NOTIFICATION)
+	utils.SendSlackNotification(fmt.Sprintf("[ERR] %v", msg), utils.AlertNotification)
 }
 
 func (a *WorkerAbs) ExportInfoLog(msg string) {
 	a.Logger.Info(msg)
-	utils.SendSlackNotification(fmt.Sprintf("[INF] %v", msg), utils.INFO_NOTIFICATION)
+	utils.SendSlackNotification(fmt.Sprintf("[INF] %v", msg), utils.InfoNotification)
 }
 
 func (a *WorkerAbs) GetID() int {

@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	ALERT_NOTIFICATION = 0
-	INFO_NOTIFICATION  = 1
+	AlertNotification = 0
+	InfoNotification  = 1
 )
 
 type SlackRequestBody struct {
@@ -22,9 +22,9 @@ type SlackRequestBody struct {
 // some text and the slack channel is saved within Slack.
 func SendSlackNotification(msg string, notiType int) error {
 	var webhookURL string
-	if notiType == ALERT_NOTIFICATION {
+	if notiType == AlertNotification {
 		webhookURL = os.Getenv("ALERT_WEBHOOK_URL")
-	} else if notiType == INFO_NOTIFICATION {
+	} else if notiType == InfoNotification {
 		webhookURL = os.Getenv("INFO_WEBHOOK_URL")
 	} else {
 		return errors.New("Notification type is not supported")

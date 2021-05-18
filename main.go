@@ -21,11 +21,11 @@ func main() {
 	workerIDsStr := strings.Split(workersStr, ",")
 	workerIDs := []int{}
 	for _, str := range workerIDsStr {
-		one_int, err := strconv.Atoi(str)
+		workerIDInt, err := strconv.Atoi(str)
 		if err != nil {
 			panic("Worker ID is invalid")
 		}
-		workerIDs = append(workerIDs, one_int)
+		workerIDs = append(workerIDs, workerIDInt)
 	}
 	fmt.Printf("List of executed worker IDs: %+v\n", workerIDs)
 
