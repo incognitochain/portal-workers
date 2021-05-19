@@ -214,8 +214,31 @@ func (b *BTCBroadcastingManager) Execute() {
 		for _, txArray := range broadcastTxArray {
 			maxLenChan += len(txArray)
 		}
-		confirmedBatchIDChan := make(chan map[string]*ConfirmedTx, maxLenChan)
+		confirmedBatchIDChan := make(chan map[string]*ConfirmedTx, maxLenChan+len(broadcastTxArray))
 
+		// check whether unshielding batches are completed by batch ID
+		for batchID := range broadcastTxArray {
+			curBatchID := batchID
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				status, err := b.getUnshieldingBatchStatus(curBatchID)
+				if err != nil {
+					b.ExportErrorLog(fmt.Sprintf("Could not get batch %v status - with err: %v", curBatchID, err))
+				} else if status.Status == 1 { // completed
+					b.ExportInfoLog(fmt.Sprintf("Batch %v is completed before", curBatchID))
+					confirmedBatchIDChan <- map[string]*ConfirmedTx{
+						curBatchID: {
+							BlkHeight: curIncBlkHeight,
+						},
+					}
+				}
+			}()
+
+		}
+		wg.Wait()
+
+		// checked whether unshielding batches are completed by BTC tx
 		for batchID, txArray := range broadcastTxArray {
 			for _, tx := range txArray {
 				if tx.IsBroadcasted {
@@ -275,13 +298,20 @@ func (b *BTCBroadcastingManager) Execute() {
 		// check if waiting too long -> send rpc to notify the Inc chain for fee replacement
 		replacedBatchIDChan := make(chan map[string]*FeeReplacementTx, len(broadcastTxArray))
 		for batchID, txArray := range broadcastTxArray {
+			status, err := b.getUnshieldingBatchStatus(batchID)
+			if err != nil {
+				b.ExportErrorLog(fmt.Sprintf("Could not get batch %v status - with err: %v", batchID, err))
+				continue
+			}
+			lastestFee := b.getLatestUnshieldFee(status.NetworkFees)
+
 			tx := getLastestBroadcastTx(txArray)
 			curBatchID := batchID
 			curTx := tx
 
 			if b.isTimeoutBTCTx(curTx, curIncBlkHeight) { // waiting too long
-				newFee := utils.GetNewFee(curTx.VSize, curTx.FeePerRequest, curTx.NumOfRequests, b.bitcoinFee)
-				fmt.Printf("Old fee %v, request new fee %v for batchID %v\n", curTx.FeePerRequest, newFee, curBatchID)
+				newFee := utils.GetNewFee(curTx.VSize, lastestFee, curTx.NumOfRequests, b.bitcoinFee)
+				fmt.Printf("Old fee %v, request new fee %v for batchID %v\n", lastestFee, newFee, curBatchID)
 				// notify the Inc chain for fee replacement
 				txID, err := b.requestFeeReplacement(curBatchID, newFee)
 				if err != nil {
@@ -339,6 +369,8 @@ func (b *BTCBroadcastingManager) Execute() {
 			return
 		}
 
-		time.Sleep(2 * time.Second)
+		sleepingTime := 10
+		fmt.Printf("Sleeping: %v seconds\n", sleepingTime)
+		time.Sleep(time.Duration(sleepingTime) * time.Second)
 	}
 }

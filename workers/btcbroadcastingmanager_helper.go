@@ -349,6 +349,37 @@ func (b *BTCBroadcastingManager) getRequestFeeReplacementTxStatus(txID string) (
 	}
 }
 
+func (b *BTCBroadcastingManager) getUnshieldingBatchStatus(batchID string) (*entities.UnshieldingBatchStatus, error) {
+	params := []interface{}{
+		map[string]string{
+			"BatchID": batchID,
+		},
+	}
+
+	var unshieldingBatchStatusRes entities.UnshieldingBatchStatusRes
+
+	err := b.RPCClient.RPCCall("getportalbatchunshieldrequeststatus", params, &unshieldingBatchStatusRes)
+	if err == nil && unshieldingBatchStatusRes.RPCError == nil {
+		return unshieldingBatchStatusRes.Result, nil
+	}
+
+	if err != nil {
+		return nil, err
+	} else {
+		return nil, fmt.Errorf(unshieldingBatchStatusRes.RPCError.Message)
+	}
+}
+
+func (b *BTCBroadcastingManager) getLatestUnshieldFee(feeState map[uint64]*entities.ExternalFeeInfo) uint {
+	maxFee := uint(0)
+	for _, fee := range feeState {
+		if maxFee <= 0 || fee.NetworkFee > maxFee {
+			maxFee = fee.NetworkFee
+		}
+	}
+	return maxFee
+}
+
 func joinTxArray(array1 map[string][]*BroadcastTx, array2 map[string][]*BroadcastTx) map[string][]*BroadcastTx {
 	joinedArray := map[string][]*BroadcastTx{}
 	for batchID, value := range array1 {
