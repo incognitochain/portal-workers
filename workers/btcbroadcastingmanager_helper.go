@@ -95,8 +95,8 @@ func (b *BTCBroadcastingManager) broadcastTx(txContent string) error {
 func (b *BTCBroadcastingManager) getUnshieldFeeInfo(batch *entities.ProcessedUnshieldRequestBatch) (uint, uint) {
 	minFee := uint(0)
 	for _, fee := range batch.ExternalFees {
-		if minFee <= 0 || fee < minFee {
-			minFee = fee
+		if minFee <= 0 || fee.NetworkFee < minFee {
+			minFee = fee.NetworkFee
 		}
 	}
 	return minFee, uint(len(batch.UnshieldsID))
