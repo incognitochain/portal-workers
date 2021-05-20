@@ -41,10 +41,6 @@ type BroadcastTx struct {
 	BlkHeight     uint64 // height of the current Incog chain height when broadcasting tx
 }
 
-type ConfirmedTx struct {
-	BlkHeight uint64
-}
-
 type BroadcastTxArrayObject struct {
 	TxArray       map[string][]*BroadcastTx
 	NextBlkHeight uint64 // height of the next block need to scan in Inc chain
@@ -92,7 +88,6 @@ func (b *BTCBroadcastingManager) Execute() {
 
 	nextBlkHeight := uint64(FirstBroadcastTxBlockHeight)
 	broadcastTxArray := map[string][]*BroadcastTx{} // key: batchID
-	confirmedTxArray := map[string]*ConfirmedTx{}   // key: batchID
 
 	// restore from db
 	lastUpdateBytes, err := b.db.Get([]byte(BroadcastingManagerDBObjectName), nil)
@@ -133,13 +128,6 @@ func (b *BTCBroadcastingManager) Execute() {
 
 		fmt.Printf("Next Scan Block Height: %v, Batch Size: %v, Current Block Height: %v\n", nextBlkHeight, IncBlockBatchSize, curIncBlkHeight)
 
-		// remove too old processed transactions
-		for batchID, value := range confirmedTxArray {
-			if value.BlkHeight+ProcessedBlkCacheDepth < curIncBlkHeight {
-				delete(confirmedTxArray, batchID)
-			}
-		}
-
 		// get list of processed batch IDs
 		processedBatchIDs := map[string]bool{}
 		for batchID := range broadcastTxArray {
@@ -148,7 +136,9 @@ func (b *BTCBroadcastingManager) Execute() {
 
 		var tempBroadcastTxArray1 map[string][]*BroadcastTx
 		var tempBroadcastTxArray2 map[string][]*BroadcastTx
-		tempBroadcastTxArray1, err = b.getBroadcastTxsFromBeaconHeight(processedBatchIDs, nextBlkHeight+IncBlockBatchSize-1, curIncBlkHeight)
+		tempBroadcastTxArray1, err = b.getBroadcastTxsFromBeaconHeight(
+			broadcastTxArray, nextBlkHeight+IncBlockBatchSize-1, curIncBlkHeight,
+		)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve Incognito block - with err: %v", err))
 			return
@@ -191,35 +181,7 @@ func (b *BTCBroadcastingManager) Execute() {
 
 		var wg sync.WaitGroup
 
-		maxLenChan := 0
-		for _, txArray := range broadcastTxArray {
-			maxLenChan += len(txArray)
-		}
-		confirmedBatchIDChan := make(chan map[string]*ConfirmedTx, maxLenChan+len(broadcastTxArray))
-
-		// check whether unshielding batches are completed by batch ID
-		for batchID := range broadcastTxArray {
-			curBatchID := batchID
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				status, err := b.getUnshieldingBatchStatus(curBatchID)
-				if err != nil {
-					b.ExportErrorLog(fmt.Sprintf("Could not get batch %v status - with err: %v", curBatchID, err))
-				} else if status.Status == 1 { // completed
-					b.ExportInfoLog(fmt.Sprintf("Batch %v is completed before", curBatchID))
-					confirmedBatchIDChan <- map[string]*ConfirmedTx{
-						curBatchID: {
-							BlkHeight: curIncBlkHeight,
-						},
-					}
-				}
-			}()
-
-		}
-		wg.Wait()
-
-		// checked whether unshielding batches are completed by BTC tx
+		// submit confirmation requests by checking BTC tx
 		for batchID, txArray := range broadcastTxArray {
 			for _, tx := range txArray {
 				if tx.IsBroadcasted {
@@ -252,13 +214,8 @@ func (b *BTCBroadcastingManager) Execute() {
 							} else {
 								if status == 0 { // rejected
 									b.ExportErrorLog(fmt.Sprintf("Send confirmation failed for batch %v, txID %v", curBatchID, txID))
-								} else {
+								} else { // succeed
 									b.ExportInfoLog(fmt.Sprintf("Send confirmation succeed for batch %v, txID %v", curBatchID, txID))
-								}
-								confirmedBatchIDChan <- map[string]*ConfirmedTx{
-									curBatchID: {
-										BlkHeight: curIncBlkHeight,
-									},
 								}
 							}
 						}()
@@ -268,30 +225,38 @@ func (b *BTCBroadcastingManager) Execute() {
 		}
 		wg.Wait()
 
+		confirmedBatchIDChan := make(chan string, len(broadcastTxArray))
+		// check whether unshielding batches are completed by batch ID
+		for batchID := range broadcastTxArray {
+			curBatchID := batchID
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				status, err := b.getUnshieldingBatchStatus(curBatchID)
+				if err != nil {
+					b.ExportErrorLog(fmt.Sprintf("Could not get batch %v status - with err: %v", curBatchID, err))
+				} else if status.Status == 1 { // completed
+					b.ExportInfoLog(fmt.Sprintf("Batch %v is completed", curBatchID))
+					confirmedBatchIDChan <- curBatchID
+				}
+			}()
+		}
+		wg.Wait()
+
 		close(confirmedBatchIDChan)
-		for batch := range confirmedBatchIDChan {
-			for batchID, tx := range batch {
-				confirmedTxArray[batchID] = tx
-				delete(broadcastTxArray, batchID)
-			}
+		for batchID := range confirmedBatchIDChan {
+			delete(broadcastTxArray, batchID)
 		}
 
 		// check if waiting too long -> send rpc to notify the Inc chain for fee replacement
 		for batchID, txArray := range broadcastTxArray {
-			status, err := b.getUnshieldingBatchStatus(batchID)
-			if err != nil {
-				b.ExportErrorLog(fmt.Sprintf("Could not get batch %v status - with err: %v", batchID, err))
-				continue
-			}
-			lastestFee := b.getLatestFeeInfo(status.NetworkFees).NetworkFee
-
 			tx := getLastestBroadcastTx(txArray)
 			curBatchID := batchID
 			curTx := tx
 
 			if b.isTimeoutBTCTx(curTx, curIncBlkHeight) { // waiting too long
-				newFee := utils.GetNewFee(curTx.VSize, lastestFee, curTx.NumOfRequests, b.bitcoinFee)
-				fmt.Printf("Old fee %v, request new fee %v for batchID %v\n", lastestFee, newFee, curBatchID)
+				newFee := utils.GetNewFee(curTx.VSize, curTx.FeePerRequest, curTx.NumOfRequests, b.bitcoinFee)
+				fmt.Printf("Old fee %v, request new fee %v for batchID %v\n", curTx.FeePerRequest, newFee, curBatchID)
 				// notify the Inc chain for fee replacement
 				txID, err := b.requestFeeReplacement(curBatchID, newFee)
 				if err != nil {

@@ -138,7 +138,9 @@ func (b *BTCBroadcastingManager) getLatestBTCBlockHashFromIncog() (uint64, error
 	return uint64(currentBTCBlkHeight), nil
 }
 
-func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchIDs map[string]bool, height uint64, curIncBlkHeight uint64) (map[string][]*BroadcastTx, error) {
+func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(
+	broadcastTxArray map[string][]*BroadcastTx, height uint64, curIncBlkHeight uint64,
+) (map[string][]*BroadcastTx, error) {
 	txArray := map[string][]*BroadcastTx{}
 	var params []interface{}
 
@@ -158,43 +160,44 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchI
 	}
 
 	for _, batch := range portalStateRes.Result.ProcessedUnshieldRequests[BTCID] {
-		_, exists := processedBatchIDs[batch.BatchID]
-		if !exists {
-			params = []interface{}{
-				map[string]string{
-					"BatchID": batch.BatchID,
-				},
-			}
-			var signedRawTxRes entities.SignedRawTxRes
-			err := b.RPCClient.RPCCall("getportalsignedrawtransaction", params, &signedRawTxRes)
-			if err != nil {
-				return txArray, err
-			}
-			if signedRawTxRes.RPCError != nil {
-				b.Logger.Errorf("getportalsignedrawtransaction: call RPC for batchID %v - with err %v\n", batch.BatchID, signedRawTxRes.RPCError.StackTrace)
-				continue
-			}
-
-			btcTxContent := signedRawTxRes.Result.SignedTx
-			btcTxHash := signedRawTxRes.Result.TxID
-			vsize, err := b.getVSizeBTCTx(btcTxContent)
-			if err != nil {
-				continue
-			}
-
-			feePerRequest, numberRequest := b.getUnshieldFeeInfo(batch)
-			acceptableFee := utils.IsEnoughFee(vsize, feePerRequest, numberRequest, b.bitcoinFee)
-			txArray[batch.BatchID] = []*BroadcastTx{{
-				TxContent:     btcTxContent,
-				TxHash:        btcTxHash,
-				VSize:         vsize,
-				RBFReqTxID:    "",
-				FeePerRequest: feePerRequest,
-				NumOfRequests: numberRequest,
-				IsBroadcasted: acceptableFee,
-				BlkHeight:     curIncBlkHeight,
+		_, exists := broadcastTxArray[batch.BatchID]
+		if exists {
+			continue
+		}
+		params = []interface{}{
+			map[string]string{
+				"BatchID": batch.BatchID,
 			},
-			}
+		}
+		var signedRawTxRes entities.SignedRawTxRes
+		err := b.RPCClient.RPCCall("getportalsignedrawtransaction", params, &signedRawTxRes)
+		if err != nil {
+			return txArray, err
+		}
+		if signedRawTxRes.RPCError != nil {
+			b.Logger.Errorf("getportalsignedrawtransaction: call RPC for batchID %v - with err %v\n", batch.BatchID, signedRawTxRes.RPCError.StackTrace)
+			continue
+		}
+
+		btcTxContent := signedRawTxRes.Result.SignedTx
+		btcTxHash := signedRawTxRes.Result.TxID
+		vsize, err := b.getVSizeBTCTx(btcTxContent)
+		if err != nil {
+			continue
+		}
+
+		feePerRequest, numberRequest := b.getUnshieldFeeInfo(batch)
+		acceptableFee := utils.IsEnoughFee(vsize, feePerRequest, numberRequest, b.bitcoinFee)
+		txArray[batch.BatchID] = []*BroadcastTx{{
+			TxContent:     btcTxContent,
+			TxHash:        btcTxHash,
+			VSize:         vsize,
+			RBFReqTxID:    "",
+			FeePerRequest: feePerRequest,
+			NumOfRequests: numberRequest,
+			IsBroadcasted: acceptableFee,
+			BlkHeight:     curIncBlkHeight,
+		},
 		}
 	}
 	return txArray, nil
@@ -400,8 +403,8 @@ func (b *BTCBroadcastingManager) getUnshieldingBatchStatus(batchID string) (*ent
 func (b *BTCBroadcastingManager) getLatestFeeInfo(feeState map[uint64]*entities.ExternalFeeInfo) *entities.ExternalFeeInfo {
 	maxBlkHeight := uint64(0)
 	for blkHeight := range feeState {
-		if blkHeight <= 0 || blkHeight > maxBlkHeight {
-			blkHeight = maxBlkHeight
+		if blkHeight > maxBlkHeight {
+			maxBlkHeight = blkHeight
 		}
 	}
 	return feeState[maxBlkHeight]
