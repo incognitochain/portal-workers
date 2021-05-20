@@ -188,6 +188,7 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchI
 				TxContent:     btcTxContent,
 				TxHash:        btcTxHash,
 				VSize:         vsize,
+				RBFReqTxID:    "",
 				FeePerRequest: feePerRequest,
 				NumOfRequests: numberRequest,
 				IsBroadcasted: acceptableFee,
@@ -199,25 +200,51 @@ func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(processedBatchI
 	return txArray, nil
 }
 
-func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray map[string]*FeeReplacementTx, curIncBlkHeight uint64) (map[string]*FeeReplacementTx, map[string][]*BroadcastTx, error) {
+func (b *BTCBroadcastingManager) getLatestRBFReqTx(
+	broadcastTxArray map[string][]*BroadcastTx, height uint64,
+) (map[string]*entities.ExternalFeeInfo, error) {
+	reqTxs := map[string]*entities.ExternalFeeInfo{}
+
+	for batchID, txArray := range broadcastTxArray {
+		status, err := b.getUnshieldingBatchStatus(batchID)
+		if err != nil {
+			b.ExportErrorLog(fmt.Sprintf("Could not get batch %v status - with err: %v", batchID, err))
+			continue
+		}
+		lastestReq := b.getLatestFeeInfo(status.NetworkFees)
+		lastCachedReq := txArray[len(txArray)-1]
+		if lastestReq.NetworkFee > lastCachedReq.FeePerRequest {
+			reqTxs[batchID] = lastestReq
+		}
+	}
+	return reqTxs, nil
+}
+
+func (b *BTCBroadcastingManager) getBroadcastReplacementTx(
+	broadcastTxArray map[string][]*BroadcastTx, reqTxs map[string]*entities.ExternalFeeInfo, curIncBlkHeight uint64,
+) (map[string][]*BroadcastTx, error) {
 	var params []interface{}
 	txArray := map[string][]*BroadcastTx{}
 
-	for batchID, tx := range feeReplacementTxArray {
-		acceptableFee := utils.IsEnoughFee(tx.VSize, tx.FeePerRequest, tx.NumOfRequests, b.bitcoinFee)
-		if acceptableFee && tx.ReqTxID != "" {
+	for batchID, reqTx := range reqTxs {
+		reqTxID := reqTx.RBFReqIncTxID
+		vsize := broadcastTxArray[batchID][0].VSize
+		numOfRequests := broadcastTxArray[batchID][0].NumOfRequests
+		feePerRequest := reqTx.NetworkFee
+		acceptableFee := utils.IsEnoughFee(vsize, feePerRequest, numOfRequests, b.bitcoinFee)
+		if acceptableFee {
 			params = []interface{}{
 				map[string]string{
-					"TxID": tx.ReqTxID,
+					"TxID": reqTxID,
 				},
 			}
 			var signedRawTxRes entities.SignedRawTxRes
 			err := b.RPCClient.RPCCall("getportalsignedrawreplacebyfeetransaction", params, &signedRawTxRes)
 			if err != nil {
-				return feeReplacementTxArray, txArray, err
+				return txArray, err
 			}
 			if signedRawTxRes.RPCError != nil {
-				b.Logger.Errorf("getportalsignedrawreplacebyfeetransaction: call RPC for ReqTxID %v - with err %v\n", tx.ReqTxID, signedRawTxRes.RPCError.StackTrace)
+				b.Logger.Errorf("getportalsignedrawreplacebyfeetransaction: call RPC for ReqTxID %v - with err %v\n", reqTxID, signedRawTxRes.RPCError.StackTrace)
 				continue
 			}
 
@@ -227,9 +254,10 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 			txArray[batchID] = []*BroadcastTx{{
 				TxContent:     btcTxContent,
 				TxHash:        btcTxHash,
-				VSize:         tx.VSize,
-				FeePerRequest: tx.FeePerRequest,
-				NumOfRequests: tx.NumOfRequests,
+				VSize:         vsize,
+				RBFReqTxID:    reqTxID,
+				FeePerRequest: feePerRequest,
+				NumOfRequests: numOfRequests,
 				IsBroadcasted: true,
 				BlkHeight:     curIncBlkHeight,
 			},
@@ -238,19 +266,18 @@ func (b *BTCBroadcastingManager) getBroadcastReplacementTx(feeReplacementTxArray
 			txArray[batchID] = []*BroadcastTx{{
 				TxContent:     "",
 				TxHash:        "",
-				VSize:         tx.VSize,
-				FeePerRequest: tx.FeePerRequest,
-				NumOfRequests: tx.NumOfRequests,
+				VSize:         vsize,
+				RBFReqTxID:    reqTxID,
+				FeePerRequest: feePerRequest,
+				NumOfRequests: numOfRequests,
 				IsBroadcasted: false,
 				BlkHeight:     curIncBlkHeight,
 			},
 			}
 		}
-
-		delete(feeReplacementTxArray, batchID)
 	}
 
-	return feeReplacementTxArray, txArray, nil
+	return txArray, nil
 }
 
 func (b *BTCBroadcastingManager) submitConfirmedTx(proof string, batchID string) (string, error) {
@@ -370,14 +397,14 @@ func (b *BTCBroadcastingManager) getUnshieldingBatchStatus(batchID string) (*ent
 	}
 }
 
-func (b *BTCBroadcastingManager) getLatestUnshieldFee(feeState map[uint64]*entities.ExternalFeeInfo) uint {
-	maxFee := uint(0)
-	for _, fee := range feeState {
-		if maxFee <= 0 || fee.NetworkFee > maxFee {
-			maxFee = fee.NetworkFee
+func (b *BTCBroadcastingManager) getLatestFeeInfo(feeState map[uint64]*entities.ExternalFeeInfo) *entities.ExternalFeeInfo {
+	maxBlkHeight := uint64(0)
+	for blkHeight := range feeState {
+		if blkHeight <= 0 || blkHeight > maxBlkHeight {
+			blkHeight = maxBlkHeight
 		}
 	}
-	return maxFee
+	return feeState[maxBlkHeight]
 }
 
 func joinTxArray(array1 map[string][]*BroadcastTx, array2 map[string][]*BroadcastTx) map[string][]*BroadcastTx {

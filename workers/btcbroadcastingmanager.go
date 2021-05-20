@@ -34,18 +34,11 @@ type BroadcastTx struct {
 	TxContent     string // only has value when be broadcasted
 	TxHash        string // only has value when be broadcasted
 	VSize         int
+	RBFReqTxID    string
 	FeePerRequest uint
 	NumOfRequests uint
 	IsBroadcasted bool
 	BlkHeight     uint64 // height of the current Incog chain height when broadcasting tx
-}
-
-type FeeReplacementTx struct {
-	ReqTxID       string
-	VSize         int
-	FeePerRequest uint
-	NumOfRequests uint
-	BlkHeight     uint64
 }
 
 type ConfirmedTx struct {
@@ -53,10 +46,8 @@ type ConfirmedTx struct {
 }
 
 type BroadcastTxArrayObject struct {
-	TxArray               map[string][]*BroadcastTx
-	FeeReplacementTxArray map[string]*FeeReplacementTx
-	ConfirmedTxArray      map[string]*ConfirmedTx
-	NextBlkHeight         uint64 // height of the next block need to scan in Inc chain
+	TxArray       map[string][]*BroadcastTx
+	NextBlkHeight uint64 // height of the next block need to scan in Inc chain
 }
 
 func (b *BTCBroadcastingManager) Init(id int, name string, freq int, network string) error {
@@ -100,9 +91,8 @@ func (b *BTCBroadcastingManager) Execute() {
 	defer b.db.Close()
 
 	nextBlkHeight := uint64(FirstBroadcastTxBlockHeight)
-	broadcastTxArray := map[string][]*BroadcastTx{}         // key: batchID
-	feeReplacementTxArray := map[string]*FeeReplacementTx{} // key: batchID
-	confirmedTxArray := map[string]*ConfirmedTx{}           // key: batchID
+	broadcastTxArray := map[string][]*BroadcastTx{} // key: batchID
+	confirmedTxArray := map[string]*ConfirmedTx{}   // key: batchID
 
 	// restore from db
 	lastUpdateBytes, err := b.db.Get([]byte(BroadcastingManagerDBObjectName), nil)
@@ -111,8 +101,6 @@ func (b *BTCBroadcastingManager) Execute() {
 		json.Unmarshal(lastUpdateBytes, &broadcastTxsDBObject)
 		nextBlkHeight = broadcastTxsDBObject.NextBlkHeight
 		broadcastTxArray = broadcastTxsDBObject.TxArray
-		feeReplacementTxArray = broadcastTxsDBObject.FeeReplacementTxArray
-		confirmedTxArray = broadcastTxsDBObject.ConfirmedTxArray
 	}
 
 	for {
@@ -152,21 +140,9 @@ func (b *BTCBroadcastingManager) Execute() {
 			}
 		}
 
-		for batchID, value := range feeReplacementTxArray {
-			if value.BlkHeight+ProcessedBlkCacheDepth < curIncBlkHeight {
-				delete(feeReplacementTxArray, batchID)
-			}
-		}
-
 		// get list of processed batch IDs
 		processedBatchIDs := map[string]bool{}
 		for batchID := range broadcastTxArray {
-			processedBatchIDs[batchID] = true
-		}
-		for batchID := range feeReplacementTxArray {
-			processedBatchIDs[batchID] = true
-		}
-		for batchID := range confirmedTxArray {
 			processedBatchIDs[batchID] = true
 		}
 
@@ -177,7 +153,12 @@ func (b *BTCBroadcastingManager) Execute() {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve Incognito block - with err: %v", err))
 			return
 		}
-		feeReplacementTxArray, tempBroadcastTxArray2, err = b.getBroadcastReplacementTx(feeReplacementTxArray, curIncBlkHeight)
+		latestRBFReqTx, err := b.getLatestRBFReqTx(broadcastTxArray, nextBlkHeight+IncBlockBatchSize-1)
+		if err != nil {
+			b.ExportErrorLog(fmt.Sprintf("Could not retrieve RBF request txs - with err: %v", err))
+			return
+		}
+		tempBroadcastTxArray2, err = b.getBroadcastReplacementTx(broadcastTxArray, latestRBFReqTx, curIncBlkHeight)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve RBF broadcast txs - with err: %v", err))
 			return
@@ -296,14 +277,13 @@ func (b *BTCBroadcastingManager) Execute() {
 		}
 
 		// check if waiting too long -> send rpc to notify the Inc chain for fee replacement
-		replacedBatchIDChan := make(chan map[string]*FeeReplacementTx, len(broadcastTxArray))
 		for batchID, txArray := range broadcastTxArray {
 			status, err := b.getUnshieldingBatchStatus(batchID)
 			if err != nil {
 				b.ExportErrorLog(fmt.Sprintf("Could not get batch %v status - with err: %v", batchID, err))
 				continue
 			}
-			lastestFee := b.getLatestUnshieldFee(status.NetworkFees)
+			lastestFee := b.getLatestFeeInfo(status.NetworkFees).NetworkFee
 
 			tx := getLastestBroadcastTx(txArray)
 			curBatchID := batchID
@@ -327,19 +307,9 @@ func (b *BTCBroadcastingManager) Execute() {
 						b.ExportErrorLog(fmt.Sprintf("Could not request RBF tx status for batch %v, txID %v - with err: %v", curBatchID, txID, err))
 					} else {
 						if status == 0 { // rejected
-							txID = ""
 							b.ExportErrorLog(fmt.Sprintf("Send RBF request failed for batch %v, txID %v", curBatchID, txID))
 						} else {
 							b.ExportInfoLog(fmt.Sprintf("Send RBF request succeed for batch %v, txID %v", curBatchID, txID))
-						}
-						replacedBatchIDChan <- map[string]*FeeReplacementTx{
-							curBatchID: {
-								ReqTxID:       txID,
-								VSize:         curTx.VSize,
-								FeePerRequest: newFee,
-								NumOfRequests: curTx.NumOfRequests,
-								BlkHeight:     curIncBlkHeight,
-							},
 						}
 					}
 				}()
@@ -347,21 +317,12 @@ func (b *BTCBroadcastingManager) Execute() {
 		}
 		wg.Wait()
 
-		close(replacedBatchIDChan)
-		for batch := range replacedBatchIDChan {
-			for batchID, tx := range batch {
-				feeReplacementTxArray[batchID] = tx
-			}
-		}
-
 		nextBlkHeight += IncBlockBatchSize
 
 		// update to db
 		BroadcastTxArrayObjectBytes, _ := json.Marshal(&BroadcastTxArrayObject{
-			TxArray:               broadcastTxArray,
-			ConfirmedTxArray:      confirmedTxArray,
-			FeeReplacementTxArray: feeReplacementTxArray,
-			NextBlkHeight:         nextBlkHeight,
+			TxArray:       broadcastTxArray,
+			NextBlkHeight: nextBlkHeight,
 		})
 		err = b.db.Put([]byte(BroadcastingManagerDBObjectName), BroadcastTxArrayObjectBytes, nil)
 		if err != nil {
