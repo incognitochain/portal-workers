@@ -13,21 +13,9 @@ import (
 )
 
 func main() {
-	var envFile, workersStr string
+	var envFile string
 	flag.StringVar(&envFile, "config", ".env_dev", ".env config file")
-	flag.StringVar(&workersStr, "workers", "1,2,3", "Excuted worker IDs")
 	flag.Parse()
-
-	workerIDsStr := strings.Split(workersStr, ",")
-	workerIDs := []int{}
-	for _, str := range workerIDsStr {
-		workerIDInt, err := strconv.Atoi(str)
-		if err != nil {
-			panic("Worker ID is invalid")
-		}
-		workerIDs = append(workerIDs, workerIDInt)
-	}
-	fmt.Printf("List of executed worker IDs: %+v\n", workerIDs)
 
 	err := godotenv.Load(envFile)
 	if err != nil {
@@ -41,6 +29,17 @@ func main() {
 		fmt.Println(key + ": " + value)
 	}
 	fmt.Println("=========End============")
+
+	workersStr := os.Getenv("WORKER_IDS")
+	workerIDsStr := strings.Split(workersStr, ",")
+	workerIDs := []int{}
+	for _, str := range workerIDsStr {
+		workerIDInt, err := strconv.Atoi(str)
+		if err != nil {
+			panic("Worker ID is invalid")
+		}
+		workerIDs = append(workerIDs, workerIDInt)
+	}
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	s := NewServer(workerIDs)
