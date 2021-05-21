@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/incognitochain/portal-workers/workers"
@@ -46,8 +44,6 @@ func NewServer(workerIDs []int) *Server {
 	}
 
 	quitChan := make(chan os.Signal, 1)
-	signal.Notify(quitChan, syscall.SIGTERM)
-	signal.Notify(quitChan, syscall.SIGINT)
 	return &Server{
 		quit:    quitChan,
 		finish:  make(chan bool, len(listWorkers)),
