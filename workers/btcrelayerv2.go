@@ -132,6 +132,12 @@ func (b *BTCRelayerV2) Execute() {
 	blockQueue := make(chan btcBlockRes, BTCBlockBatchSize)
 	relayingResQueue := make(chan error, BTCBlockBatchSize)
 	for {
+		isBTCNodeAlive := getBTCFullnodeStatus(b.btcClient)
+		if !isBTCNodeAlive {
+			b.ExportErrorLog("Could not connect to BTC full node")
+			return
+		}
+
 		var wg sync.WaitGroup
 		for i := nextBlkHeight; i < nextBlkHeight+BTCBlockBatchSize; i++ {
 			i := i // create locals for closure below

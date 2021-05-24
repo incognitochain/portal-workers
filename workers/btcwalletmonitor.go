@@ -121,6 +121,12 @@ func (b *BTCWalletMonitor) Execute() {
 	}
 
 	for {
+		isBTCNodeAlive := getBTCFullnodeStatus(b.btcClient)
+		if !isBTCNodeAlive {
+			b.ExportErrorLog("Could not connect to BTC full node")
+			return
+		}
+
 		// get new rescanning instance from API
 		currentTimeStamp := time.Now().Unix()
 		newlyTrackingInstance, err := b.getTrackingInstance(lastTimeUpdated, currentTimeStamp)

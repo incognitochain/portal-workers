@@ -99,6 +99,12 @@ func (b *BTCBroadcastingManager) Execute() {
 	}
 
 	for {
+		isBTCNodeAlive := getBTCFullnodeStatus(b.btcClient)
+		if !isBTCNodeAlive {
+			b.ExportErrorLog("Could not connect to BTC full node")
+			return
+		}
+
 		b.bitcoinFee, err = utils.GetCurrentRelayingFee()
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not get bitcoin fee - with err: %v", err))
