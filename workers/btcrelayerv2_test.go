@@ -1,48 +1,45 @@
 package workers
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
+	"os"
 	"testing"
 
-	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/wire"
 )
 
-func TestBuildBlkHeader(t *testing.T) {
+func TestRelayBTCBlock(t *testing.T) {
+	os.Setenv("INCOGNITO_PAYMENT_ADDRESS", "12svfkP6w5UDJDSCwqH978PvqiqBxKmUnA9em9yAYWYJVRv7wuXY1qhhYpPAm4BDz2mLbFrRmdK3yRhnTqJCZXKHUmoi7NV83HCH2YFpctHNaDdkSiQshsjw2UFUuwdEvcidgaKmF3VJpY5f8RdN")
+	os.Setenv("INCOGNITO_PRIVATE_KEY", "112t8roafGgHL1rhAP9632Yef3sx5k8xgp8cwK4MCJsCL1UWcxXvpzg97N4dwvcD735iKf31Q2ZgrAvKfVjeSUEvnzKJyyJD3GqqSZdxN4or")
+	os.Setenv("INCOGNITO_PROTOCOL", "http")
+	os.Setenv("INCOGNITO_HOST", "51.79.76.38")
+	os.Setenv("INCOGNITO_PORT", "8334")
+	os.Setenv("BTC_NETWORK", "reg")
+	os.Setenv("BTC_NODE_HOST", "51.79.76.38")
+	os.Setenv("BTC_NODE_PORT", "18443")
+	os.Setenv("BTC_NODE_USERNAME", "admin")
+	os.Setenv("BTC_NODE_PASSWORD", "123123AZ")
 
-	b := &BTCBroadcastingManager{}
-	// init bitcoin rpcclient
-	connCfg := &rpcclient.ConnConfig{
-		Host:         fmt.Sprintf("%s:%s", "51.161.119.66", "18443"),
-		User:         "thach",
-		Pass:         "deptrai",
-		HTTPPostMode: true, // Bitcoin core only supports HTTP POST mode
-		DisableTLS:   true, // Bitcoin core does not provide TLS by default
-	}
+	b := &BTCRelayerV2{}
+	b.Init(3, "BTC Header Relayer", 60, os.Getenv("BTC_NETWORK"))
 
-	var err error
-	b.btcClient, err = rpcclient.New(connCfg, nil)
-	if err != nil {
-		t.FailNow()
-	}
+	for blkHeight := 4640; blkHeight < 5496; blkHeight++ {
+		btcBlockHeight := int64(blkHeight)
+		blkHash, err := b.btcClient.GetBlockHash(btcBlockHeight)
+		if err != nil {
+			t.FailNow()
+		}
+		msgBlk, err := b.btcClient.GetBlock(blkHash)
+		if err != nil {
+			t.FailNow()
+		}
+		msgBlk.Transactions = []*wire.MsgTx{}
 
-	btcBlockHeight := int64(1937581)
-	blkHash, err := b.btcClient.GetBlockHash(btcBlockHeight)
-	if err != nil {
-		t.FailNow()
+		err = b.relayBTCBlockToIncognito(btcBlockHeight, msgBlk)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			t.FailNow()
+		}
+		fmt.Printf("Relayed block: %+v\n", blkHeight)
 	}
-	msgBlk, err := b.btcClient.GetBlock(blkHash)
-	if err != nil {
-		t.FailNow()
-	}
-	msgBlk.Transactions = []*wire.MsgTx{}
-	msgBlkBytes, err := json.Marshal(msgBlk)
-	if err != nil {
-		t.FailNow()
-	}
-
-	headerBlockStr := base64.StdEncoding.EncodeToString(msgBlkBytes)
-	t.Logf("Header: %+v", headerBlockStr)
 }
