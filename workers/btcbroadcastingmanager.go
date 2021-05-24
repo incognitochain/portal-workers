@@ -42,8 +42,8 @@ type BroadcastTx struct {
 }
 
 type BroadcastTxArrayObject struct {
-	TxArray       map[string][]*BroadcastTx
-	NextBlkHeight uint64 // height of the next block need to scan in Inc chain
+	TxArray       map[string]map[string]*BroadcastTx // key: batchID | RBFRexTxID
+	NextBlkHeight uint64                             // height of the next block need to scan in Inc chain
 }
 
 func (b *BTCBroadcastingManager) Init(id int, name string, freq int, network string) error {
@@ -87,7 +87,7 @@ func (b *BTCBroadcastingManager) Execute() {
 	defer b.db.Close()
 
 	nextBlkHeight := uint64(FirstBroadcastTxBlockHeight)
-	broadcastTxArray := map[string][]*BroadcastTx{} // key: batchID
+	broadcastTxArray := map[string]map[string]*BroadcastTx{}
 
 	// restore from db
 	lastUpdateBytes, err := b.db.Get([]byte(BroadcastingManagerDBObjectName), nil)
@@ -140,30 +140,29 @@ func (b *BTCBroadcastingManager) Execute() {
 			processedBatchIDs[batchID] = true
 		}
 
-		var tempBroadcastTxArray1 map[string][]*BroadcastTx
-		var tempBroadcastTxArray2 map[string][]*BroadcastTx
-		tempBroadcastTxArray1, err = b.getBroadcastTxsFromBeaconHeight(
-			broadcastTxArray, nextBlkHeight+IncBlockBatchSize-1, curIncBlkHeight,
-		)
+		var curBroadcastTxArray map[string]map[string]*BroadcastTx
+		batchIDs, err := b.getBatchIDsFromBeaconHeight(nextBlkHeight + IncBlockBatchSize - 1)
 		if err != nil {
-			b.ExportErrorLog(fmt.Sprintf("Could not retrieve Incognito block - with err: %v", err))
+			b.ExportErrorLog(fmt.Sprintf("Could not retrieve batches from beacon block %v - with err: %v", nextBlkHeight+IncBlockBatchSize-1, err))
 			return
 		}
-		latestRBFReqTx, err := b.getLatestRBFReqTx(broadcastTxArray, nextBlkHeight+IncBlockBatchSize-1)
+		curBroadcastTxArray, err = b.getBroadcastTx(batchIDs, curIncBlkHeight)
 		if err != nil {
-			b.ExportErrorLog(fmt.Sprintf("Could not retrieve RBF request txs - with err: %v", err))
-			return
-		}
-		tempBroadcastTxArray2, err = b.getBroadcastReplacementTx(broadcastTxArray, latestRBFReqTx, curIncBlkHeight)
-		if err != nil {
-			b.ExportErrorLog(fmt.Sprintf("Could not retrieve RBF broadcast txs - with err: %v", err))
+			b.ExportErrorLog(fmt.Sprintf("Could not retrieve broadcast txs - with err: %v", err))
 			return
 		}
 
-		tempBroadcastTxArray := joinTxArray(tempBroadcastTxArray1, tempBroadcastTxArray2)
+		for batchID, batchInfo := range curBroadcastTxArray {
+			for reqTxID, tx := range batchInfo {
+				var exists bool
+				_, exists = broadcastTxArray[batchID]
+				if exists {
+					_, exists = broadcastTxArray[batchID][reqTxID]
+					if exists {
+						continue
+					}
+				}
 
-		for batchID, txArray := range tempBroadcastTxArray {
-			for _, tx := range txArray {
 				if tx.IsBroadcasted {
 					fmt.Printf("Broadcast tx for batch %v, content %v \n", batchID, tx.TxContent)
 					err := b.broadcastTx(tx.TxContent)
@@ -176,7 +175,8 @@ func (b *BTCBroadcastingManager) Execute() {
 				}
 			}
 		}
-		broadcastTxArray = joinTxArray(broadcastTxArray, tempBroadcastTxArray)
+
+		broadcastTxArray = curBroadcastTxArray
 
 		// check confirmed -> send rpc to notify the Inc chain
 		relayingBTCHeight, err := b.getLatestBTCBlockHashFromIncog()
