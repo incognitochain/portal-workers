@@ -179,7 +179,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		broadcastTxArray = joinTxArray(broadcastTxArray, tempBroadcastTxArray)
 
 		// check confirmed -> send rpc to notify the Inc chain
-		relayingBTCHeight, err := b.getLatestBTCBlockHashFromIncog()
+		relayingBTCHeight, err := getLatestBTCHeightFromIncog(b.RPCBTCRelayingReaders)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve Inc relaying BTC block height - with err: %v", err))
 			return

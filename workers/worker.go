@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	go_incognito "github.com/inc-backend/go-incognito"
 	"github.com/incognitochain/portal-workers/utils"
@@ -12,14 +13,15 @@ import (
 )
 
 type WorkerAbs struct {
-	ID        int
-	Name      string
-	Frequency int // in sec
-	Quit      chan bool
-	RPCClient *utils.HttpClient
-	Client    *go_incognito.PublicIncognito
-	Network   string // mainnet, testnet, ...
-	Logger    *logrus.Entry
+	ID                    int
+	Name                  string
+	Frequency             int // in sec
+	Quit                  chan bool
+	RPCClient             *utils.HttpClient
+	RPCBTCRelayingReaders []*utils.HttpClient
+	Client                *go_incognito.PublicIncognito
+	Network               string // mainnet, testnet, ...
+	Logger                *logrus.Entry
 }
 
 type Worker interface {
@@ -41,6 +43,22 @@ func (a *WorkerAbs) Init(id int, name string, freq int, network string) error {
 	a.Quit = make(chan bool)
 
 	a.RPCClient = utils.NewHttpClient("", os.Getenv("INCOGNITO_PROTOCOL"), os.Getenv("INCOGNITO_HOST"), os.Getenv("INCOGNITO_PORT"))
+
+	beaconIps := strings.Split(os.Getenv("INCOGNITO_READER_HOST_LIST"), ",")
+	beaconPorts := strings.Split(os.Getenv("INCOGNITO_READER_PORT_LIST"), ",")
+
+	if len(beaconIps) != len(beaconPorts) {
+		panic("Hosts and Ports must be equal in btc relaying alerter")
+	}
+
+	for i, v := range beaconIps {
+		a.RPCBTCRelayingReaders = append(a.RPCBTCRelayingReaders, utils.NewHttpClient(
+			"",
+			os.Getenv("INCOGNITO_READER_PROTOCOL"),
+			v,
+			beaconPorts[i],
+		)) // incognito chain reader rpc
+	}
 
 	client := &http.Client{}
 	publicIncognito := go_incognito.NewPublicIncognito(

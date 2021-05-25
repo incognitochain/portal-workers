@@ -1,7 +1,6 @@
 package workers
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -56,26 +55,6 @@ func (b *BTCWalletMonitor) getRequestShieldingStatus(txID string) (int, error) {
 	} else {
 		return 0, fmt.Errorf(requestShieldingStatusRes.RPCError.Message)
 	}
-}
-
-func (b *BTCWalletMonitor) getLatestBTCBlockHashFromIncog() (uint64, error) {
-	params := []interface{}{}
-	var btcRelayingBestStateRes entities.BTCRelayingBestStateRes
-	err := b.RPCClient.RPCCall("getbtcrelayingbeststate", params, &btcRelayingBestStateRes)
-	if err != nil {
-		return 0, err
-	}
-	if btcRelayingBestStateRes.RPCError != nil {
-		return 0, errors.New(btcRelayingBestStateRes.RPCError.Message)
-	}
-
-	// check whether there was a fork happened or not
-	btcBestState := btcRelayingBestStateRes.Result
-	if btcBestState == nil {
-		return 0, errors.New("BTC relaying best state is nil")
-	}
-	currentBTCBlkHeight := btcBestState.Height
-	return uint64(currentBTCBlkHeight), nil
 }
 
 func (b *BTCWalletMonitor) getTrackingInstance(from int64, to int64) ([]*ShieldingMonitoringInfo, error) {

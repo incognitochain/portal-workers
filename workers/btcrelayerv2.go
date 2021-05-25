@@ -3,14 +3,12 @@ package workers
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/incognitochain/portal-workers/entities"
 	"github.com/incognitochain/portal-workers/utils"
 
 	"github.com/btcsuite/btcd/rpcclient"
@@ -87,41 +85,9 @@ func (b *BTCRelayerV2) relayBTCBlockToIncognito(
 	return nil
 }
 
-func (b *BTCRelayerV2) getLatestBTCBlockHashFromIncog(btcClient *rpcclient.Client) (int32, error) {
-	params := []interface{}{}
-	var btcRelayingBestStateRes entities.BTCRelayingBestStateRes
-	err := b.RPCClient.RPCCall("getbtcrelayingbeststate", params, &btcRelayingBestStateRes)
-	if err != nil {
-		return 0, err
-	}
-	if btcRelayingBestStateRes.RPCError != nil {
-		return 0, errors.New(btcRelayingBestStateRes.RPCError.Message)
-	}
-
-	// check whether there was a fork happened or not
-	btcBestState := btcRelayingBestStateRes.Result
-	if btcBestState == nil {
-		return 0, errors.New("BTC relaying best state is nil")
-	}
-	currentBTCBlkHashStr := btcBestState.Hash.String()
-	currentBTCBlkHeight := btcBestState.Height
-	blkHash, err := btcClient.GetBlockHash(int64(currentBTCBlkHeight))
-	if err != nil {
-		return 0, err
-	}
-
-	if blkHash.String() != currentBTCBlkHashStr { // fork detected
-		msg := fmt.Sprintf("There was a fork happened at block %d, stepping back %d blocks now...", currentBTCBlkHeight, BlockStepBacks)
-		b.Logger.Warnf(msg)
-		utils.SendSlackNotification(msg, utils.AlertNotification)
-		return currentBTCBlkHeight - BlockStepBacks, nil
-	}
-	return currentBTCBlkHeight, nil
-}
-
 func (b *BTCRelayerV2) Execute() {
 	// get latest BTC block from Incognito
-	latestBTCBlkHeight, err := b.getLatestBTCBlockHashFromIncog(b.btcClient)
+	latestBTCBlkHeight, err := getLatestBTCHeightFromIncogWithoutFork(b.btcClient, b.RPCBTCRelayingReaders, b.Logger)
 	if err != nil {
 		b.ExportErrorLog(fmt.Sprintf("Could not get latest btc block height from incognito chain - with err: %v", err))
 		return

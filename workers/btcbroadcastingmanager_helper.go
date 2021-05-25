@@ -117,27 +117,6 @@ func (b *BTCBroadcastingManager) getLatestBeaconHeight() (uint64, error) {
 	return beaconBestStateRes.Result.BeaconHeight, nil
 }
 
-func (b *BTCBroadcastingManager) getLatestBTCBlockHashFromIncog() (uint64, error) {
-	params := []interface{}{}
-	var btcRelayingBestStateRes entities.BTCRelayingBestStateRes
-	err := b.RPCClient.RPCCall("getbtcrelayingbeststate", params, &btcRelayingBestStateRes)
-	if err != nil {
-		return 0, err
-	}
-	if btcRelayingBestStateRes.RPCError != nil {
-		b.Logger.Errorf("getLatestBTCBlockHashFromIncog: call RPC error, %v\n", btcRelayingBestStateRes.RPCError.StackTrace)
-		return 0, errors.New(btcRelayingBestStateRes.RPCError.Message)
-	}
-
-	// check whether there was a fork happened or not
-	btcBestState := btcRelayingBestStateRes.Result
-	if btcBestState == nil {
-		return 0, errors.New("BTC relaying best state is nil")
-	}
-	currentBTCBlkHeight := btcBestState.Height
-	return uint64(currentBTCBlkHeight), nil
-}
-
 func (b *BTCBroadcastingManager) getBroadcastTxsFromBeaconHeight(
 	broadcastTxArray map[string][]*BroadcastTx, height uint64, curIncBlkHeight uint64,
 ) (map[string][]*BroadcastTx, error) {

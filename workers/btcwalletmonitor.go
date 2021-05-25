@@ -208,7 +208,7 @@ func (b *BTCWalletMonitor) Execute() {
 		}
 
 		// send shielding request RPC to Incognito chain
-		relayingBTCHeight, err := b.getLatestBTCBlockHashFromIncog()
+		relayingBTCHeight, err := getLatestBTCHeightFromIncog(b.RPCBTCRelayingReaders)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve Inc relaying BTC block height - with err: %v", err))
 			return
