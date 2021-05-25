@@ -32,28 +32,28 @@ func (b *BTCWalletMonitor) submitShieldingRequest(incAddress string, proof strin
 	return txID, nil
 }
 
-func (b *BTCWalletMonitor) getRequestShieldingStatus(txID string) (int, error) {
+func (b *BTCWalletMonitor) getRequestShieldingStatus(txID string) (int, string, error) {
 	params := []interface{}{
 		map[string]string{
 			"ReqTxID": txID,
 		},
 	}
 
-	var requestShieldingStatusRes entities.RequestStatusRes
+	var requestShieldingStatusRes entities.ShieldingRequestStatusRes
 
 	var err error
 	for idx := 0; idx < NUM_GET_STATUS_TRIES; idx++ {
 		time.Sleep(INTERVAL_TRIES)
 		err = b.RPCClient.RPCCall("getportalshieldingrequeststatus", params, &requestShieldingStatusRes)
 		if err == nil && requestShieldingStatusRes.RPCError == nil {
-			return requestShieldingStatusRes.Result.Status, nil
+			return requestShieldingStatusRes.Result.Status, requestShieldingStatusRes.Result.Error, nil
 		}
 	}
 
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	} else {
-		return 0, fmt.Errorf(requestShieldingStatusRes.RPCError.Message)
+		return 0, "", fmt.Errorf(requestShieldingStatusRes.RPCError.Message)
 	}
 }
 
