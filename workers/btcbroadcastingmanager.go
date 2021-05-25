@@ -76,7 +76,7 @@ func (b *BTCBroadcastingManager) ExportInfoLog(msg string) {
 // - Check for a Bitcoin transaction is stuck or not and request RBF transaction
 // - Check a broadcasted Bitcoin transaction confirmation and notify the Incognito chain
 func (b *BTCBroadcastingManager) Execute() {
-	b.Logger.Info("BTCBroadcastingManager worker is executing...")
+	b.ExportErrorLog("BTCBroadcastingManager worker is executing...")
 	// init leveldb instance
 	var err error
 	b.db, err = leveldb.OpenFile(BroadcastingManagerDBFileDir, nil)

@@ -84,7 +84,7 @@ func (b *BTCWalletMonitor) ExportInfoLog(msg string) {
 // - Monitor Bitcoin multisig wallets that corresponding with Incognito Wallet App users
 // - Send shielding request on behalf of users to Incognito chain
 func (b *BTCWalletMonitor) Execute() {
-	b.Logger.Info("BTCWalletMonitor worker is executing...")
+	b.ExportErrorLog("BTCWalletMonitor worker is executing...")
 	// init leveldb instance
 	var err error
 	b.db, err = leveldb.OpenFile(WalletMonitorDBFileDir, nil)
@@ -237,10 +237,10 @@ func (b *BTCWalletMonitor) Execute() {
 					} else {
 						if status == 0 { // rejected
 							if errorStr == "IsExistedProof" {
-								b.ExportErrorLog(fmt.Sprintf("Request shielding failed BTC tx %v, shielding txID %v - duplicated", curTxHash, txID))
+								b.ExportErrorLog(fmt.Sprintf("Request shielding failed BTC tx %v, shielding txID %v - duplicated proof", curTxHash, txID))
 								sentShieldingRequest <- curTxHash
 							} else {
-								b.ExportErrorLog(fmt.Sprintf("Request shielding failed BTC tx %v, shielding txID %v - err: %v", curTxHash, txID, err))
+								b.ExportErrorLog(fmt.Sprintf("Request shielding failed BTC tx %v, shielding txID %v - invalid proof", curTxHash, txID))
 							}
 						} else {
 							b.ExportInfoLog(fmt.Sprintf("Request shielding succeed BTC tx %v, shielding txID %v", curTxHash, txID))

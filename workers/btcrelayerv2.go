@@ -86,6 +86,7 @@ func (b *BTCRelayerV2) relayBTCBlockToIncognito(
 }
 
 func (b *BTCRelayerV2) Execute() {
+	b.ExportErrorLog("BTCRelayer worker is executing...")
 	// get latest BTC block from Incognito
 	latestBTCBlkHeight, err := getLatestBTCHeightFromIncogWithoutFork(b.btcClient, b.RPCBTCRelayingReaders, b.Logger)
 	if err != nil {
