@@ -7,6 +7,7 @@ type ExternalFeeInfo struct {
 
 type UnshieldingBatchStatus struct {
 	Status      int
+	UnshieldIDs []string
 	NetworkFees map[uint64]*ExternalFeeInfo
 }
 

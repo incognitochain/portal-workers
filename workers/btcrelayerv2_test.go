@@ -1,7 +1,6 @@
 package workers
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
@@ -23,7 +22,8 @@ func TestRelayBTCBlock(t *testing.T) {
 	b := &BTCRelayerV2{}
 	b.Init(3, "BTC Header Relayer", 60, os.Getenv("BTC_NETWORK"))
 
-	for blkHeight := 4640; blkHeight < 5496; blkHeight++ {
+	blkHeight := 4556
+	for blkHeight <= 5496 {
 		btcBlockHeight := int64(blkHeight)
 		blkHash, err := b.btcClient.GetBlockHash(btcBlockHeight)
 		if err != nil {
@@ -37,9 +37,8 @@ func TestRelayBTCBlock(t *testing.T) {
 
 		err = b.relayBTCBlockToIncognito(btcBlockHeight, msgBlk)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			t.FailNow()
+		} else {
+			blkHeight++
 		}
-		fmt.Printf("Relayed block: %+v\n", blkHeight)
 	}
 }
