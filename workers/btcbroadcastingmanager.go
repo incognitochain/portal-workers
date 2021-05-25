@@ -134,35 +134,19 @@ func (b *BTCBroadcastingManager) Execute() {
 
 		fmt.Printf("Next Scan Block Height: %v, Batch Size: %v, Current Block Height: %v\n", nextBlkHeight, IncBlockBatchSize, curIncBlkHeight)
 
-		// get list of processed batch IDs
-		processedBatchIDs := map[string]bool{}
-		for batchID := range broadcastTxArray {
-			processedBatchIDs[batchID] = true
-		}
-
-		var curBroadcastTxArray map[string]map[string]*BroadcastTx
 		batchIDs, err := b.getBatchIDsFromBeaconHeight(nextBlkHeight + IncBlockBatchSize - 1)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve batches from beacon block %v - with err: %v", nextBlkHeight+IncBlockBatchSize-1, err))
 			return
 		}
-		curBroadcastTxArray, err = b.getBroadcastTx(batchIDs, curIncBlkHeight)
+		newBroadcastTxArray, err := b.getBroadcastTx(broadcastTxArray, batchIDs, curIncBlkHeight)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve broadcast txs - with err: %v", err))
 			return
 		}
 
-		for batchID, batchInfo := range curBroadcastTxArray {
-			for reqTxID, tx := range batchInfo {
-				var exists bool
-				_, exists = broadcastTxArray[batchID]
-				if exists {
-					_, exists = broadcastTxArray[batchID][reqTxID]
-					if exists {
-						continue
-					}
-				}
-
+		for batchID, batchInfo := range newBroadcastTxArray {
+			for _, tx := range batchInfo {
 				if tx.IsBroadcasted {
 					fmt.Printf("Broadcast tx for batch %v, content %v \n", batchID, tx.TxContent)
 					err := b.broadcastTx(tx.TxContent)
@@ -176,7 +160,7 @@ func (b *BTCBroadcastingManager) Execute() {
 			}
 		}
 
-		broadcastTxArray = curBroadcastTxArray
+		broadcastTxArray = joinTxArray(broadcastTxArray, newBroadcastTxArray)
 
 		// check confirmed -> send rpc to notify the Inc chain
 		relayingBTCHeight, err := b.getLatestBTCBlockHashFromIncog()

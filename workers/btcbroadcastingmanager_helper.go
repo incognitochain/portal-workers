@@ -162,10 +162,103 @@ func (b *BTCBroadcastingManager) getBatchIDsFromBeaconHeight(height uint64) ([]s
 	return batchIDs, nil
 }
 
+func (b *BTCBroadcastingManager) getInitialRawTx(
+	batchID string, status *entities.UnshieldingBatchStatus, curIncBlkHeight uint64,
+) (*BroadcastTx, error) {
+	params := []interface{}{
+		map[string]string{
+			"BatchID": batchID,
+		},
+	}
+	var signedRawTxRes entities.SignedRawTxRes
+	err := b.RPCClient.RPCCall("getportalsignedrawtransaction", params, &signedRawTxRes)
+	if err != nil {
+		b.Logger.Errorf("getportalsignedrawtransaction: call RPC for batchID %v - with err %v\n", batchID, err)
+		return nil, err
+	}
+	if signedRawTxRes.RPCError != nil {
+		b.Logger.Errorf("getportalsignedrawtransaction: call RPC for batchID %v - with err %v\n", batchID, signedRawTxRes.RPCError.StackTrace)
+		return nil, err
+	}
+
+	btcTxContent := signedRawTxRes.Result.SignedTx
+	btcTxHash := signedRawTxRes.Result.TxID
+	vsize, err := b.getVSizeBTCTx(btcTxContent)
+	if err != nil {
+		b.Logger.Errorf("get vsize of tx for batchID %v - with err %v\n", batchID, err)
+		return nil, err
+	}
+
+	feePerRequest, numberRequest := b.getUnshieldFeeInfo(status)
+	acceptableFee := utils.IsEnoughFee(vsize, feePerRequest, numberRequest, b.bitcoinFee)
+	return &BroadcastTx{
+		TxContent:     btcTxContent,
+		TxHash:        btcTxHash,
+		VSize:         vsize,
+		RBFReqTxID:    "",
+		FeePerRequest: feePerRequest,
+		NumOfRequests: numberRequest,
+		IsBroadcasted: acceptableFee,
+		BlkHeight:     curIncBlkHeight,
+	}, nil
+}
+
+func (b *BTCBroadcastingManager) getRBFRawTx(
+	batchID string, reqTx *entities.ExternalFeeInfo, initBroadcastTx *BroadcastTx, curIncBlkHeight uint64,
+) (*BroadcastTx, error) {
+	reqTxID := reqTx.RBFReqIncTxID
+	vsize := initBroadcastTx.VSize
+	numOfRequests := initBroadcastTx.NumOfRequests
+	feePerRequest := reqTx.NetworkFee
+	acceptableFee := utils.IsEnoughFee(vsize, feePerRequest, numOfRequests, b.bitcoinFee)
+
+	if acceptableFee {
+		params := []interface{}{
+			map[string]string{
+				"TxID": reqTxID,
+			},
+		}
+		var signedRawTxRes entities.SignedRawTxRes
+		err := b.RPCClient.RPCCall("getportalsignedrawreplacebyfeetransaction", params, &signedRawTxRes)
+		if err != nil {
+			b.Logger.Errorf("getportalsignedrawreplacebyfeetransaction: call RPC for ReqTxID %v - with err %v\n", reqTxID, err)
+			return nil, err
+		}
+		if signedRawTxRes.RPCError != nil {
+			b.Logger.Errorf("getportalsignedrawreplacebyfeetransaction: call RPC for ReqTxID %v - with err %v\n", reqTxID, signedRawTxRes.RPCError.StackTrace)
+			return nil, err
+		}
+
+		btcTxContent := signedRawTxRes.Result.SignedTx
+		btcTxHash := signedRawTxRes.Result.TxID
+
+		return &BroadcastTx{
+			TxContent:     btcTxContent,
+			TxHash:        btcTxHash,
+			VSize:         vsize,
+			RBFReqTxID:    reqTxID,
+			FeePerRequest: feePerRequest,
+			NumOfRequests: numOfRequests,
+			IsBroadcasted: true,
+			BlkHeight:     curIncBlkHeight,
+		}, nil
+	} else {
+		return &BroadcastTx{
+			TxContent:     "",
+			TxHash:        "",
+			VSize:         vsize,
+			RBFReqTxID:    reqTxID,
+			FeePerRequest: feePerRequest,
+			NumOfRequests: numOfRequests,
+			IsBroadcasted: false,
+			BlkHeight:     curIncBlkHeight,
+		}, nil
+	}
+}
+
 func (b *BTCBroadcastingManager) getBroadcastTx(
-	batchIDs []string, curIncBlkHeight uint64,
+	previousBroadcastTxArray map[string]map[string]*BroadcastTx, batchIDs []string, curIncBlkHeight uint64,
 ) (map[string]map[string]*BroadcastTx, error) {
-	var params []interface{}
 	txArray := map[string]map[string]*BroadcastTx{}
 
 	for _, batchID := range batchIDs {
@@ -176,93 +269,44 @@ func (b *BTCBroadcastingManager) getBroadcastTx(
 		}
 		txArray[batchID] = map[string]*BroadcastTx{}
 
+		var initBroadcastTx *BroadcastTx
 		for _, reqTx := range status.NetworkFees {
 			if reqTx.RBFReqIncTxID == "" {
-				params = []interface{}{
-					map[string]string{
-						"BatchID": batchID,
-					},
-				}
-				var signedRawTxRes entities.SignedRawTxRes
-				err := b.RPCClient.RPCCall("getportalsignedrawtransaction", params, &signedRawTxRes)
-				if err != nil {
-					return txArray, err
-				}
-				if signedRawTxRes.RPCError != nil {
-					b.Logger.Errorf("getportalsignedrawtransaction: call RPC for batchID %v - with err %v\n", batchID, signedRawTxRes.RPCError.StackTrace)
-					continue
+				var isExisted bool
+				_, isExisted = previousBroadcastTxArray[batchID]
+				if isExisted {
+					_, isExisted = previousBroadcastTxArray[batchID][""]
+					if isExisted {
+						initBroadcastTx = previousBroadcastTxArray[batchID][""]
+						continue
+					}
 				}
 
-				btcTxContent := signedRawTxRes.Result.SignedTx
-				btcTxHash := signedRawTxRes.Result.TxID
-				vsize, err := b.getVSizeBTCTx(btcTxContent)
+				broadcastTx, err := b.getInitialRawTx(batchID, status, curIncBlkHeight)
 				if err != nil {
-					continue
+					return txArray, nil
 				}
-
-				feePerRequest, numberRequest := b.getUnshieldFeeInfo(status)
-				acceptableFee := utils.IsEnoughFee(vsize, feePerRequest, numberRequest, b.bitcoinFee)
-				txArray[batchID][""] = &BroadcastTx{
-					TxContent:     btcTxContent,
-					TxHash:        btcTxHash,
-					VSize:         vsize,
-					RBFReqTxID:    "",
-					FeePerRequest: feePerRequest,
-					NumOfRequests: numberRequest,
-					IsBroadcasted: acceptableFee,
-					BlkHeight:     curIncBlkHeight,
-				}
+				txArray[batchID][""] = broadcastTx
+				initBroadcastTx = broadcastTx
 			}
 		}
 
 		for _, reqTx := range status.NetworkFees {
 			if reqTx.RBFReqIncTxID != "" {
-				reqTxID := reqTx.RBFReqIncTxID
-				vsize := txArray[batchID][""].VSize
-				numOfRequests := txArray[batchID][""].NumOfRequests
-				feePerRequest := reqTx.NetworkFee
-				acceptableFee := utils.IsEnoughFee(vsize, feePerRequest, numOfRequests, b.bitcoinFee)
-				if acceptableFee {
-					params = []interface{}{
-						map[string]string{
-							"TxID": reqTxID,
-						},
-					}
-					var signedRawTxRes entities.SignedRawTxRes
-					err := b.RPCClient.RPCCall("getportalsignedrawreplacebyfeetransaction", params, &signedRawTxRes)
-					if err != nil {
-						return txArray, err
-					}
-					if signedRawTxRes.RPCError != nil {
-						b.Logger.Errorf("getportalsignedrawreplacebyfeetransaction: call RPC for ReqTxID %v - with err %v\n", reqTxID, signedRawTxRes.RPCError.StackTrace)
+				var isExisted bool
+				_, isExisted = previousBroadcastTxArray[batchID]
+				if isExisted {
+					_, isExisted = previousBroadcastTxArray[batchID][reqTx.RBFReqIncTxID]
+					if isExisted {
 						continue
 					}
-
-					btcTxContent := signedRawTxRes.Result.SignedTx
-					btcTxHash := signedRawTxRes.Result.TxID
-
-					txArray[batchID][reqTxID] = &BroadcastTx{
-						TxContent:     btcTxContent,
-						TxHash:        btcTxHash,
-						VSize:         vsize,
-						RBFReqTxID:    reqTxID,
-						FeePerRequest: feePerRequest,
-						NumOfRequests: numOfRequests,
-						IsBroadcasted: true,
-						BlkHeight:     curIncBlkHeight,
-					}
-				} else {
-					txArray[batchID][reqTxID] = &BroadcastTx{
-						TxContent:     "",
-						TxHash:        "",
-						VSize:         vsize,
-						RBFReqTxID:    reqTxID,
-						FeePerRequest: feePerRequest,
-						NumOfRequests: numOfRequests,
-						IsBroadcasted: false,
-						BlkHeight:     curIncBlkHeight,
-					}
 				}
+
+				broadcastTx, err := b.getRBFRawTx(batchID, reqTx, initBroadcastTx, curIncBlkHeight)
+				if err != nil {
+					return txArray, err
+				}
+				txArray[batchID][reqTx.RBFReqIncTxID] = broadcastTx
 			}
 		}
 	}
@@ -395,4 +439,29 @@ func getLastestBroadcastTx(txArray map[string]*BroadcastTx) *BroadcastTx {
 		}
 	}
 	return lastestTx
+}
+
+func joinTxArray(
+	array1 map[string]map[string]*BroadcastTx, array2 map[string]map[string]*BroadcastTx,
+) map[string]map[string]*BroadcastTx {
+	joinedArray := map[string]map[string]*BroadcastTx{}
+	for batchID, batchContent := range array1 {
+		_, exist := joinedArray[batchID]
+		if !exist {
+			joinedArray[batchID] = map[string]*BroadcastTx{}
+		}
+		for rbfTxID, value := range batchContent {
+			joinedArray[batchID][rbfTxID] = value
+		}
+	}
+	for batchID, batchContent := range array2 {
+		_, exist := joinedArray[batchID]
+		if !exist {
+			joinedArray[batchID] = map[string]*BroadcastTx{}
+		}
+		for rbfTxID, value := range batchContent {
+			joinedArray[batchID][rbfTxID] = value
+		}
+	}
+	return joinedArray
 }
