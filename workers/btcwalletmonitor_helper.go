@@ -42,8 +42,8 @@ func (b *BTCWalletMonitor) getRequestShieldingStatus(txID string) (int, string, 
 	var requestShieldingStatusRes entities.ShieldingRequestStatusRes
 
 	var err error
-	for idx := 0; idx < NUM_GET_STATUS_TRIES; idx++ {
-		time.Sleep(INTERVAL_TRIES)
+	for idx := 0; idx < NumGetStatusTries; idx++ {
+		time.Sleep(IntervalTries)
 		err = b.RPCClient.RPCCall("getportalshieldingrequeststatus", params, &requestShieldingStatusRes)
 		if err == nil && requestShieldingStatusRes.RPCError == nil {
 			return requestShieldingStatusRes.Result.Status, requestShieldingStatusRes.Result.Error, nil

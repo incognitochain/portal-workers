@@ -326,8 +326,8 @@ func (b *BTCBroadcastingManager) getSubmitConfirmedTxStatus(txID string) (int, e
 	var confirmedTxStatusRes entities.RequestStatusRes
 
 	var err error
-	for idx := 0; idx < NUM_GET_STATUS_TRIES; idx++ {
-		time.Sleep(INTERVAL_TRIES)
+	for idx := 0; idx < NumGetStatusTries; idx++ {
+		time.Sleep(IntervalTries)
 		err = b.RPCClient.RPCCall("getportalsubmitconfirmedtxstatus", params, &confirmedTxStatusRes)
 		if err == nil && confirmedTxStatusRes.RPCError == nil {
 			return confirmedTxStatusRes.Result.Status, nil
@@ -374,8 +374,8 @@ func (b *BTCBroadcastingManager) getRequestFeeReplacementTxStatus(txID string) (
 	var feeReplacementStatusRes entities.RequestStatusRes
 
 	var err error
-	for idx := 0; idx < NUM_GET_STATUS_TRIES; idx++ {
-		time.Sleep(INTERVAL_TRIES)
+	for idx := 0; idx < NumGetStatusTries; idx++ {
+		time.Sleep(IntervalTries)
 		err = b.RPCClient.RPCCall("getportalreplacebyfeestatus", params, &feeReplacementStatusRes)
 		if err == nil && feeReplacementStatusRes.RPCError == nil {
 			return feeReplacementStatusRes.Result.Status, nil

@@ -18,8 +18,9 @@ import (
 )
 
 const (
-	BTCBlockBatchSize = 1 // BTCBlockBatchSize is BTC block batch size
-	BlockStepBacks    = 8 // BlockStepBacks is number of blocks that the job needs to step back to solve fork situation
+	BTCBlockBatchSize   = 10 // BTCBlockBatchSize is BTC block batch size
+	BlockStepBacks      = 8  // BlockStepBacks is number of blocks that the job needs to step back to solve fork situation
+	FrontRelayThreshold = 20 // Max block height that relayer create relay txs to Incog chain compare with current relaying block height
 )
 
 type btcBlockRes struct {
@@ -99,6 +100,17 @@ func (b *BTCRelayerV2) Execute() {
 	blockQueue := make(chan btcBlockRes, BTCBlockBatchSize)
 	relayingResQueue := make(chan error, BTCBlockBatchSize)
 	for {
+		// get latest BTC block from Incognito
+		latestBTCBlkHeight, err = getLatestBTCHeightFromIncogWithoutFork(b.btcClient, b.RPCBTCRelayingReaders, b.Logger)
+		if err != nil {
+			b.ExportErrorLog(fmt.Sprintf("Could not get latest btc block height from incognito chain - with err: %v", err))
+			return
+		}
+		if nextBlkHeight > latestBTCBlkHeight+FrontRelayThreshold {
+			b.ExportErrorLog("Relaying BTC block heights are too high compare with current relaying best state")
+			nextBlkHeight = latestBTCBlkHeight + 1
+		}
+
 		isBTCNodeAlive := getBTCFullnodeStatus(b.btcClient)
 		if !isBTCNodeAlive {
 			b.ExportErrorLog("Could not connect to BTC full node")
