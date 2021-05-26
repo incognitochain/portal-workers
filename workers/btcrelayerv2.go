@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -144,8 +145,17 @@ func (b *BTCRelayerV2) Execute() {
 		}
 		wg.Wait()
 
+		btcBlkArr := []btcBlockRes{}
 		for i := nextBlkHeight; i < nextBlkHeight+BTCBlockBatchSize; i++ {
 			btcBlkRes := <-blockQueue
+			btcBlkArr = append(btcBlkArr, btcBlkRes)
+		}
+		sort.Slice(btcBlkArr, func(i, j int) bool {
+			return btcBlkArr[i].blockHeight < btcBlkArr[j].blockHeight
+		})
+
+		for i := 0; i < BTCBlockBatchSize; i++ {
+			btcBlkRes := btcBlkArr[i]
 			if btcBlkRes.err != nil {
 				relayingResQueue <- btcBlkRes.err
 			} else {
