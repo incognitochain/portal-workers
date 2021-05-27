@@ -3,10 +3,8 @@ package workers
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -100,45 +98,6 @@ func (b *BTCBroadcastingManager) getUnshieldFeeInfo(status *entities.Unshielding
 		}
 	}
 	return minFee, uint(len(status.UnshieldIDs))
-}
-
-func (b *BTCBroadcastingManager) getLatestBeaconHeight() (uint64, error) {
-	params := []interface{}{}
-	var beaconBestStateRes entities.BeaconBestStateRes
-	err := b.RPCClient.RPCCall("getbeaconbeststate", params, &beaconBestStateRes)
-	if err != nil {
-		return 0, err
-	}
-
-	if beaconBestStateRes.RPCError != nil {
-		b.Logger.Errorf("getLatestBeaconHeight: call RPC error, %v\n", beaconBestStateRes.RPCError.StackTrace)
-		return 0, errors.New(beaconBestStateRes.RPCError.Message)
-	}
-	return beaconBestStateRes.Result.BeaconHeight, nil
-}
-
-func (b *BTCBroadcastingManager) getBatchIDsFromBeaconHeight(height uint64) ([]string, error) {
-	batchIDs := []string{}
-
-	params := []interface{}{
-		map[string]string{
-			"BeaconHeight": strconv.FormatUint(height, 10),
-		},
-	}
-	var portalStateRes entities.PortalV4StateByHeightRes
-	err := b.RPCClient.RPCCall("getportalv4state", params, &portalStateRes)
-	if err != nil {
-		return batchIDs, err
-	}
-	if portalStateRes.RPCError != nil {
-		b.Logger.Errorf("getportalv4state: call RPC error, %v\n", portalStateRes.RPCError.StackTrace)
-		return batchIDs, errors.New(portalStateRes.RPCError.Message)
-	}
-
-	for _, batch := range portalStateRes.Result.ProcessedUnshieldRequests[BTCID] {
-		batchIDs = append(batchIDs, batch.BatchID)
-	}
-	return batchIDs, nil
 }
 
 func (b *BTCBroadcastingManager) getInitialRawTx(

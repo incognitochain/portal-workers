@@ -101,6 +101,12 @@ func (b *BTCRelayerV2) Execute() {
 	blockQueue := make(chan btcBlockRes, BTCBlockBatchSize)
 	relayingResQueue := make(chan error, BTCBlockBatchSize)
 	for {
+		isBTCNodeAlive := getBTCFullnodeStatus(b.btcClient)
+		if !isBTCNodeAlive {
+			b.ExportErrorLog("Could not connect to BTC full node")
+			return
+		}
+
 		// get latest BTC block from Incognito
 		latestBTCBlkHeight, err = getLatestBTCHeightFromIncogWithoutFork(b.btcClient, b.RPCBTCRelayingReaders, b.Logger)
 		if err != nil {
@@ -110,12 +116,6 @@ func (b *BTCRelayerV2) Execute() {
 		if nextBlkHeight > latestBTCBlkHeight+FrontRelayThreshold {
 			b.ExportErrorLog("Relaying BTC block heights are too high compare with current relaying best state")
 			nextBlkHeight = latestBTCBlkHeight + 1
-		}
-
-		isBTCNodeAlive := getBTCFullnodeStatus(b.btcClient)
-		if !isBTCNodeAlive {
-			b.ExportErrorLog("Could not connect to BTC full node")
-			return
 		}
 
 		var wg sync.WaitGroup

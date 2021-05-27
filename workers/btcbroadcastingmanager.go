@@ -114,7 +114,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		// wait until next blocks available
 		var curIncBlkHeight uint64
 		for {
-			curIncBlkHeight, err = b.getLatestBeaconHeight()
+			curIncBlkHeight, err = getLatestBeaconHeight(b.RPCClient, b.Logger)
 			if err != nil {
 				b.ExportErrorLog(fmt.Sprintf("Could not get latest beacon height - with err: %v", err))
 				return
@@ -134,7 +134,7 @@ func (b *BTCBroadcastingManager) Execute() {
 
 		fmt.Printf("Next Scan Block Height: %v, Batch Size: %v, Current Block Height: %v\n", nextBlkHeight, IncBlockBatchSize, curIncBlkHeight)
 
-		batchIDs, err := b.getBatchIDsFromBeaconHeight(nextBlkHeight + IncBlockBatchSize - 1)
+		batchIDs, err := getBatchIDsFromBeaconHeight(nextBlkHeight+IncBlockBatchSize-1, b.RPCClient, b.Logger)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve batches from beacon block %v - with err: %v", nextBlkHeight+IncBlockBatchSize-1, err))
 			return

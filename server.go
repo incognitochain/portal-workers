@@ -42,6 +42,22 @@ func NewServer(workerIDs []int) *Server {
 		}
 		listWorkers = append(listWorkers, btcRelayingHeaderWorker)
 	}
+	if contain(workerIDs, 4) {
+		relayingAlerterWorker := &workers.RelayingAlerter{}
+		err = relayingAlerterWorker.Init(4, "Relaying Alerter", 60, os.Getenv("BTC_NETWORK"))
+		if err != nil {
+			panic("Can't init Relaying Alerter")
+		}
+		listWorkers = append(listWorkers, relayingAlerterWorker)
+	}
+	if contain(workerIDs, 5) {
+		unshieldingAlerterWorker := &workers.UnshieldingAlerter{}
+		err = unshieldingAlerterWorker.Init(5, "Unshielding Alerter", 60, os.Getenv("BTC_NETWORK"))
+		if err != nil {
+			panic("Can't init Unshielding Alerter")
+		}
+		listWorkers = append(listWorkers, unshieldingAlerterWorker)
+	}
 
 	quitChan := make(chan os.Signal, 1)
 	return &Server{
