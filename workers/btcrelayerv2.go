@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -118,8 +117,29 @@ func (b *BTCRelayerV2) Execute() {
 			nextBlkHeight = latestBTCBlkHeight + 1
 		}
 
+		// wait until next BTC blocks available
+		var btcBestHeight int64
+		for {
+			btcBestHeight, err = b.btcClient.GetBlockCount()
+			if err != nil {
+				b.ExportErrorLog("Could not get btc best state from BTC fullnode")
+				return
+			}
+			if int64(nextBlkHeight) <= btcBestHeight {
+				break
+			}
+			time.Sleep(40 * time.Second)
+		}
+
+		var batchSize uint64
+		if nextBlkHeight+uint64(BTCBlockBatchSize-1) <= uint64(btcBestHeight) { // load until the final view
+			batchSize = BTCBlockBatchSize
+		} else {
+			batchSize = uint64(btcBestHeight) - nextBlkHeight + 1
+		}
+
 		var wg sync.WaitGroup
-		for i := nextBlkHeight; i < nextBlkHeight+BTCBlockBatchSize; i++ {
+		for i := nextBlkHeight; i < nextBlkHeight+batchSize; i++ {
 			i := i // create locals for closure below
 			wg.Add(1)
 			go func() {
@@ -146,7 +166,7 @@ func (b *BTCRelayerV2) Execute() {
 		wg.Wait()
 
 		btcBlkArr := []btcBlockRes{}
-		for i := nextBlkHeight; i < nextBlkHeight+BTCBlockBatchSize; i++ {
+		for i := nextBlkHeight; i < nextBlkHeight+batchSize; i++ {
 			btcBlkRes := <-blockQueue
 			btcBlkArr = append(btcBlkArr, btcBlkRes)
 		}
@@ -154,7 +174,7 @@ func (b *BTCRelayerV2) Execute() {
 			return btcBlkArr[i].blockHeight < btcBlkArr[j].blockHeight
 		})
 
-		for i := 0; i < BTCBlockBatchSize; i++ {
+		for i := 0; i < int(batchSize); i++ {
 			btcBlkRes := btcBlkArr[i]
 			if btcBlkRes.err != nil {
 				relayingResQueue <- btcBlkRes.err
@@ -165,18 +185,16 @@ func (b *BTCRelayerV2) Execute() {
 			}
 		}
 
-		for i := nextBlkHeight; i < nextBlkHeight+BTCBlockBatchSize; i++ {
+		for i := nextBlkHeight; i < nextBlkHeight+batchSize; i++ {
 			relayingErr := <-relayingResQueue
 
 			if relayingErr != nil {
-				if !strings.Contains(relayingErr.Error(), "Block height out of range") {
-					b.ExportErrorLog(fmt.Sprintf("BTC relaying error: %v\n", relayingErr))
-				}
+				b.ExportErrorLog(fmt.Sprintf("BTC relaying error: %v\n", relayingErr))
 				return
 			}
 		}
 
-		nextBlkHeight += BTCBlockBatchSize
+		nextBlkHeight += batchSize
 		time.Sleep(2 * time.Second)
 	}
 }
