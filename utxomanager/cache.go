@@ -104,8 +104,6 @@ func (c *UTXOManager) GetUTXOsByAmount(privateKey string, amount uint64) ([]UTXO
 	publicKeyBytes := keyWallet.KeySet.PaymentAddress.Pk
 	publicKey := base58.Base58Check{}.Encode(publicKeyBytes, common.ZeroByte)
 
-	fmt.Printf("Length: %v\n", len(c.Unspent[publicKey]))
-
 	rescan := true
 	_, isExisted := c.Unspent[publicKey]
 	if isExisted {
