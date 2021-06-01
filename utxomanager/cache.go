@@ -9,6 +9,10 @@ import (
 	"github.com/incognitochain/portal-workers/utils"
 )
 
+const (
+	TmpPrefix = "Tmp"
+)
+
 func (c *UTXOManager) getCachedUTXOByPublicKey(publicKey string) map[string][]UTXO {
 	_, isExisted := c.Caches[publicKey]
 	if isExisted {
@@ -52,6 +56,9 @@ func (c *UTXOManager) cacheUTXOsByTmpTxID(publicKey string, txID string, utxos [
 func (c *UTXOManager) uncachedUTXOsByCheckingTxID(publicKey string, rpcClient *utils.HttpClient) {
 	cachedUTXOs := c.getCachedUTXOByPublicKey(publicKey)
 	for txID := range cachedUTXOs {
+		if len(txID) > len(TmpPrefix) && txID[:3] == TmpPrefix {
+			continue
+		}
 		txDetail, err := getTxByHash(rpcClient, txID)
 		// tx was rejected or tx was confirmed
 		if (txDetail == nil && err != nil) || (txDetail.IsInBlock) {
@@ -126,7 +133,7 @@ func (c *UTXOManager) GetUTXOsByAmount(privateKey string, amount uint64) ([]UTXO
 		if sum >= amount {
 			utxos := c.Unspent[publicKey][:idx+1]
 			c.TmpIdx = (c.TmpIdx + 1) % 10000
-			tmpTxID := fmt.Sprint("Tmp%v", c.TmpIdx)
+			tmpTxID := fmt.Sprintf("%v%v", TmpPrefix, c.TmpIdx)
 			c.cacheUTXOsByTmpTxID(publicKey, tmpTxID, utxos)
 			c.Unspent[publicKey] = c.Unspent[publicKey][idx+1:]
 			return utxos, tmpTxID, nil
