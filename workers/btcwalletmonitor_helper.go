@@ -16,7 +16,7 @@ func (b *BTCWalletMonitor) submitShieldingRequest(incAddress string, proof strin
 		"ShieldingProof":  proof,
 	}
 
-	result, err := b.Portal.Shielding(os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata)
+	result, err := b.Portal.Shielding(os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata, nil)
 	if err != nil {
 		return "", err
 	}

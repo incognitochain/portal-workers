@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/incognitochain/portal-workers/utxomanager"
 	"github.com/incognitochain/portal-workers/workers"
 )
 
@@ -14,13 +15,13 @@ type Server struct {
 	workers []workers.Worker
 }
 
-func NewServer(workerIDs []int) *Server {
+func NewServer(utxoManager *utxomanager.UTXOCache, workerIDs []int) *Server {
 	listWorkers := []workers.Worker{}
 	var err error
 
 	if contain(workerIDs, 1) {
 		btcBroadcastingManager := &workers.BTCBroadcastingManager{}
-		err = btcBroadcastingManager.Init(1, "BTC Broadcasting Manager", 60, os.Getenv("BTC_NETWORK"))
+		err = btcBroadcastingManager.Init(1, "BTC Broadcasting Manager", 60, os.Getenv("BTC_NETWORK"), utxoManager)
 		if err != nil {
 			panic("Can't init BTC Broadcasting Manager")
 		}
@@ -28,7 +29,7 @@ func NewServer(workerIDs []int) *Server {
 	}
 	if contain(workerIDs, 2) {
 		btcWalletMonitorWorker := &workers.BTCWalletMonitor{}
-		err = btcWalletMonitorWorker.Init(2, "BTC Wallet Monitor", 60, os.Getenv("BTC_NETWORK"))
+		err = btcWalletMonitorWorker.Init(2, "BTC Wallet Monitor", 60, os.Getenv("BTC_NETWORK"), utxoManager)
 		if err != nil {
 			panic("Can't init BTC Wallet Monitor")
 		}
@@ -36,7 +37,7 @@ func NewServer(workerIDs []int) *Server {
 	}
 	if contain(workerIDs, 3) {
 		btcRelayingHeaderWorker := &workers.BTCRelayerV2{}
-		err = btcRelayingHeaderWorker.Init(3, "BTC Header Relayer", 60, os.Getenv("BTC_NETWORK"))
+		err = btcRelayingHeaderWorker.Init(3, "BTC Header Relayer", 60, os.Getenv("BTC_NETWORK"), utxoManager)
 		if err != nil {
 			panic("Can't init BTC Header Relayer")
 		}
@@ -44,7 +45,7 @@ func NewServer(workerIDs []int) *Server {
 	}
 	if contain(workerIDs, 4) {
 		relayingAlerterWorker := &workers.RelayingAlerter{}
-		err = relayingAlerterWorker.Init(4, "Relaying Alerter", 60, os.Getenv("BTC_NETWORK"))
+		err = relayingAlerterWorker.Init(4, "Relaying Alerter", 60, os.Getenv("BTC_NETWORK"), utxoManager)
 		if err != nil {
 			panic("Can't init Relaying Alerter")
 		}
@@ -52,7 +53,7 @@ func NewServer(workerIDs []int) *Server {
 	}
 	if contain(workerIDs, 5) {
 		unshieldingAlerterWorker := &workers.UnshieldingAlerter{}
-		err = unshieldingAlerterWorker.Init(5, "Unshielding Alerter", 60, os.Getenv("BTC_NETWORK"))
+		err = unshieldingAlerterWorker.Init(5, "Unshielding Alerter", 60, os.Getenv("BTC_NETWORK"), utxoManager)
 		if err != nil {
 			panic("Can't init Unshielding Alerter")
 		}

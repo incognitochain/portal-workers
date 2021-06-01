@@ -3,6 +3,8 @@ package workers
 import (
 	"fmt"
 	"time"
+
+	"github.com/incognitochain/portal-workers/utxomanager"
 )
 
 const (
@@ -15,8 +17,8 @@ type UnshieldingAlerter struct {
 	WorkerAbs
 }
 
-func (b *UnshieldingAlerter) Init(id int, name string, freq int, network string) error {
-	b.WorkerAbs.Init(id, name, freq, network)
+func (b *UnshieldingAlerter) Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOCache) error {
+	b.WorkerAbs.Init(id, name, freq, network, utxoManager)
 
 	return nil
 }

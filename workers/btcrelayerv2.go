@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"sort"
 	"sync"
 	"time"
 
 	"github.com/incognitochain/portal-workers/utils"
+	"github.com/incognitochain/portal-workers/utxomanager"
 
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/wire"
@@ -35,8 +35,8 @@ type BTCRelayerV2 struct {
 	btcClient      *rpcclient.Client
 }
 
-func (b *BTCRelayerV2) Init(id int, name string, freq int, network string) error {
-	b.WorkerAbs.Init(id, name, freq, network)
+func (b *BTCRelayerV2) Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOCache) error {
+	b.WorkerAbs.Init(id, name, freq, network, utxoManager)
 
 	b.RelayingHeader = go_incognito.NewRelayingChainHeader(b.Client)
 
@@ -52,8 +52,7 @@ func (b *BTCRelayerV2) Init(id int, name string, freq int, network string) error
 }
 
 func (b *BTCRelayerV2) relayBTCBlockToIncognito(
-	btcBlockHeight int64,
-	msgBlk *wire.MsgBlock,
+	btcBlockHeight int64, msgBlk *wire.MsgBlock, utxo utxomanager.UTXO, utxoManager *utxomanager.UTXOCache,
 ) error {
 	msgBlkBytes, err := json.Marshal(msgBlk)
 	if err != nil {
@@ -67,10 +66,18 @@ func (b *BTCRelayerV2) relayBTCBlockToIncognito(
 		"BlockHeight":   fmt.Sprintf("%v", btcBlockHeight),
 	}
 
-	result, err := b.RelayingHeader.RelayBTCHeader(os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata)
+	utxos := []string{}
+	if utxoManager != nil {
+		utxos = []string{utxo.KeyImage}
+	}
+	result, err := b.RelayingHeader.RelayBTCHeader(
+		os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata, utxos,
+	)
+
 	if err != nil {
 		return err
 	}
+
 	resp, err := b.Client.SubmitRawData(result)
 	if err != nil {
 		return err
@@ -79,6 +86,10 @@ func (b *BTCRelayerV2) relayBTCBlockToIncognito(
 	txID, err := transformer.TransformersTxHash(resp)
 	if err != nil {
 		return err
+	}
+
+	if utxoManager != nil {
+		utxomanager.CacheSpentUTXOs(os.Getenv("INCOGNITO_PRIVATE_KEY"), txID, []utxomanager.UTXO{utxo}, utxoManager)
 	}
 
 	b.ExportInfoLog(fmt.Sprintf("relayBTCBlockToIncognito success (%d) with TxID: %v\n", btcBlockHeight, txID))
@@ -165,25 +176,37 @@ func (b *BTCRelayerV2) Execute() {
 		}
 		wg.Wait()
 
-		btcBlkArr := []btcBlockRes{}
-		for i := nextBlkHeight; i < nextBlkHeight+batchSize; i++ {
-			btcBlkRes := <-blockQueue
-			btcBlkArr = append(btcBlkArr, btcBlkRes)
+		unspentUTXOs, err := utxomanager.GetListUnspentUTXO(
+			b.Wallet, os.Getenv("INCOGNITO_PRIVATE_KEY"), b.UTXOManager, b.RPCClient,
+		)
+		if err != nil {
+			b.ExportErrorLog(fmt.Sprintf("Could not get list unspent UTXOs: %+v", err))
+			return
 		}
-		sort.Slice(btcBlkArr, func(i, j int) bool {
-			return btcBlkArr[i].blockHeight < btcBlkArr[j].blockHeight
-		})
+		if len(unspentUTXOs) < int(batchSize) {
+			b.ExportErrorLog(fmt.Sprintf("Not enough unspent UTXOs: %+v needed %+v", len(unspentUTXOs), int(batchSize)))
+			return
+		}
 
+		// ! Could relay not in increasing order
 		for i := 0; i < int(batchSize); i++ {
-			btcBlkRes := btcBlkArr[i]
-			if btcBlkRes.err != nil {
-				relayingResQueue <- btcBlkRes.err
-			} else {
-				//relay next BTC block to Incognito
-				err := b.relayBTCBlockToIncognito(btcBlkRes.blockHeight, btcBlkRes.msgBlock)
-				relayingResQueue <- err
-			}
+			spendingUTXO := unspentUTXOs[i]
+			btcBlkRes := <-blockQueue
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if btcBlkRes.err != nil {
+					relayingResQueue <- btcBlkRes.err
+				} else {
+					//relay next BTC block to Incognito
+					err := b.relayBTCBlockToIncognito(
+						btcBlkRes.blockHeight, btcBlkRes.msgBlock, spendingUTXO, b.UTXOManager,
+					)
+					relayingResQueue <- err
+				}
+			}()
 		}
+		wg.Wait()
 
 		for i := nextBlkHeight; i < nextBlkHeight+batchSize; i++ {
 			relayingErr := <-relayingResQueue
@@ -195,6 +218,6 @@ func (b *BTCRelayerV2) Execute() {
 		}
 
 		nextBlkHeight += batchSize
-		time.Sleep(2 * time.Second)
+		time.Sleep(15 * time.Second)
 	}
 }

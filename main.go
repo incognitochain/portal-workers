@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/incognitochain/portal-workers/utils"
+	"github.com/incognitochain/portal-workers/utxomanager"
+
 	"github.com/joho/godotenv"
 )
 
@@ -41,8 +43,11 @@ func main() {
 		workerIDs = append(workerIDs, workerIDInt)
 	}
 
+	utxoManager := &utxomanager.UTXOCache{}
+	utxoManager.Caches = map[string]map[string][]utxomanager.UTXO{}
+
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	s := NewServer(workerIDs)
+	s := NewServer(utxoManager, workerIDs)
 
 	// split utxos before executing workers
 	if os.Getenv("SPLITUTXO") == "true" {
@@ -53,7 +58,11 @@ func main() {
 		protocol := os.Getenv("INCOGNITO_PROTOCOL")
 		endpointUri := fmt.Sprintf("%v://%v:%v", os.Getenv("INCOGNITO_PROTOCOL"), os.Getenv("INCOGNITO_HOST"), os.Getenv("INCOGNITO_PORT"))
 
-		err := utils.SplitUTXOs(endpointUri, protocol, privateKey, paymentAddress, minNumUTXOs)
+		httpClient := utils.NewHttpClient("", os.Getenv("INCOGNITO_PROTOCOL"), os.Getenv("INCOGNITO_HOST"), os.Getenv("INCOGNITO_PORT"))
+
+		err := utxomanager.SplitUTXOs(
+			endpointUri, protocol, privateKey, paymentAddress, minNumUTXOs, utxoManager, httpClient,
+		)
 		if err != nil {
 			panic("Could not split UTXOs")
 		}

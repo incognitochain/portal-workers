@@ -259,7 +259,7 @@ func (b *BTCBroadcastingManager) submitConfirmedTx(proof string, batchID string)
 		"UnshieldProof": proof,
 	}
 
-	result, err := b.Portal.SubmitConfirmedTx(os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata)
+	result, err := b.Portal.SubmitConfirmedTx(os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata, nil)
 	if err != nil {
 		return "", err
 	}
@@ -307,7 +307,7 @@ func (b *BTCBroadcastingManager) requestFeeReplacement(batchID string, newFee ui
 		"ReplacementFee": fmt.Sprintf("%v", newFee),
 	}
 
-	result, err := b.Portal.ReplaceByFee(os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata)
+	result, err := b.Portal.ReplaceByFee(os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata, nil)
 	if err != nil {
 		return "", err
 	}

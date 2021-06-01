@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/rpcclient"
 	go_incognito "github.com/inc-backend/go-incognito"
 	"github.com/incognitochain/portal-workers/utils"
+	"github.com/incognitochain/portal-workers/utxomanager"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -46,8 +47,10 @@ type BroadcastTxArrayObject struct {
 	NextBlkHeight uint64                             // height of the next block need to scan in Inc chain
 }
 
-func (b *BTCBroadcastingManager) Init(id int, name string, freq int, network string) error {
-	b.WorkerAbs.Init(id, name, freq, network)
+func (b *BTCBroadcastingManager) Init(
+	id int, name string, freq int, network string, utxoManager *utxomanager.UTXOCache,
+) error {
+	b.WorkerAbs.Init(id, name, freq, network, utxoManager)
 
 	b.Portal = go_incognito.NewPortal(b.Client)
 

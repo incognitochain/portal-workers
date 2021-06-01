@@ -6,6 +6,7 @@ import (
 
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/incognitochain/portal-workers/utils"
+	"github.com/incognitochain/portal-workers/utxomanager"
 )
 
 const (
@@ -18,8 +19,8 @@ type RelayingAlerter struct {
 	btcClient *rpcclient.Client
 }
 
-func (b *RelayingAlerter) Init(id int, name string, freq int, network string) error {
-	b.WorkerAbs.Init(id, name, freq, network)
+func (b *RelayingAlerter) Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOCache) error {
+	b.WorkerAbs.Init(id, name, freq, network, utxoManager)
 
 	var err error
 	// init bitcoin rpcclient

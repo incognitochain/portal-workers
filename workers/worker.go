@@ -2,13 +2,13 @@ package workers
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
 	go_incognito "github.com/inc-backend/go-incognito"
 	"github.com/incognitochain/portal-workers/utils"
+	"github.com/incognitochain/portal-workers/utxomanager"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,11 +21,13 @@ type WorkerAbs struct {
 	RPCBTCRelayingReaders []*utils.HttpClient
 	Client                *go_incognito.PublicIncognito
 	Network               string // mainnet, testnet, ...
+	UTXOManager           *utxomanager.UTXOCache
+	Wallet                *go_incognito.Wallet
 	Logger                *logrus.Entry
 }
 
 type Worker interface {
-	Init(id int, name string, freq int, network string) error
+	Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOCache) error
 	Execute()
 	ExportErrorLog(msg string)
 	ExportInfoLog(msg string)
@@ -36,7 +38,7 @@ type Worker interface {
 	GetNetwork() string
 }
 
-func (a *WorkerAbs) Init(id int, name string, freq int, network string) error {
+func (a *WorkerAbs) Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOCache) error {
 	a.ID = id
 	a.Name = name
 	a.Frequency = freq
@@ -60,20 +62,21 @@ func (a *WorkerAbs) Init(id int, name string, freq int, network string) error {
 		)) // incognito chain reader rpc
 	}
 
-	client := &http.Client{}
 	publicIncognito := go_incognito.NewPublicIncognito(
-		client,
 		fmt.Sprintf("%v://%v:%v", os.Getenv("INCOGNITO_PROTOCOL"), os.Getenv("INCOGNITO_HOST"), os.Getenv("INCOGNITO_PORT")),
 		os.Getenv("INCOGNITO_COINSERVICE_URL"),
-		2,
 	)
 	a.Client = publicIncognito
+	blockInfo := go_incognito.NewBlockInfo(publicIncognito)
+	a.Wallet = go_incognito.NewWallet(publicIncognito, blockInfo)
 
 	a.Network = network
 	logger, err := instantiateLogger(a.Name)
 	if err != nil {
 		panic(fmt.Sprintf("Could instantiate a logger for worker: %v\n", a.Name))
 	}
+
+	a.UTXOManager = utxoManager
 	a.Logger = logger
 	return err
 }

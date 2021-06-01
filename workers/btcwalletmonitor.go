@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcutil"
 	go_incognito "github.com/inc-backend/go-incognito"
 	"github.com/incognitochain/portal-workers/utils"
+	"github.com/incognitochain/portal-workers/utxomanager"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -48,8 +49,8 @@ type ShieldingTxArrayObject struct {
 	LastTimeStampUpdated    int64
 }
 
-func (b *BTCWalletMonitor) Init(id int, name string, freq int, network string) error {
-	b.WorkerAbs.Init(id, name, freq, network)
+func (b *BTCWalletMonitor) Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOCache) error {
+	b.WorkerAbs.Init(id, name, freq, network, utxoManager)
 
 	b.Portal = go_incognito.NewPortal(b.Client)
 
