@@ -15,7 +15,7 @@ type Server struct {
 	workers []workers.Worker
 }
 
-func NewServer(utxoManager *utxomanager.UTXOCache, workerIDs []int) *Server {
+func NewServer(utxoManager *utxomanager.UTXOManager, workerIDs []int) *Server {
 	listWorkers := []workers.Worker{}
 	var err error
 

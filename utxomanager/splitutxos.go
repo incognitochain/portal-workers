@@ -20,7 +20,7 @@ const (
 
 func SplitUTXOs(
 	endpointUri string, protocol string, privateKey string, paymentAddress string, minNumUTXOs int,
-	utxoManager *UTXOCache, httpClient *utils.HttpClient,
+	utxoManager *UTXOManager, httpClient *utils.HttpClient,
 ) error {
 	publicIncognito := go_incognito.NewPublicIncognito(
 		endpointUri,
@@ -35,7 +35,7 @@ func SplitUTXOs(
 	cntLoop := 0
 
 	for {
-		utxos, err := GetListUnspentUTXO(wallet, privateKey, utxoManager, httpClient)
+		utxos, err := utxoManager.GetListUnspentUTXO(privateKey)
 		if err != nil {
 			return err
 		}
@@ -87,7 +87,8 @@ func SplitUTXOs(
 				if err != nil {
 					return
 				}
-				CacheSpentUTXOs(privateKey, txID, []UTXO{utxo}, utxoManager)
+
+				utxoManager.CacheUTXOsByTxID(privateKey, txID, []UTXO{utxo})
 				fmt.Printf("TxID: %+v\n", txID)
 			}()
 		}

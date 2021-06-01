@@ -48,7 +48,7 @@ type BroadcastTxArrayObject struct {
 }
 
 func (b *BTCBroadcastingManager) Init(
-	id int, name string, freq int, network string, utxoManager *utxomanager.UTXOCache,
+	id int, name string, freq int, network string, utxoManager *utxomanager.UTXOManager,
 ) error {
 	b.WorkerAbs.Init(id, name, freq, network, utxoManager)
 

@@ -49,7 +49,7 @@ type ShieldingTxArrayObject struct {
 	LastTimeStampUpdated    int64
 }
 
-func (b *BTCWalletMonitor) Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOCache) error {
+func (b *BTCWalletMonitor) Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOManager) error {
 	b.WorkerAbs.Init(id, name, freq, network, utxoManager)
 
 	b.Portal = go_incognito.NewPortal(b.Client)

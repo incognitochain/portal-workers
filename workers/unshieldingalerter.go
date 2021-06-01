@@ -17,7 +17,7 @@ type UnshieldingAlerter struct {
 	WorkerAbs
 }
 
-func (b *UnshieldingAlerter) Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOCache) error {
+func (b *UnshieldingAlerter) Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOManager) error {
 	b.WorkerAbs.Init(id, name, freq, network, utxoManager)
 
 	return nil

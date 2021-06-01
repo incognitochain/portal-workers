@@ -19,7 +19,7 @@ type RelayingAlerter struct {
 	btcClient *rpcclient.Client
 }
 
-func (b *RelayingAlerter) Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOCache) error {
+func (b *RelayingAlerter) Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOManager) error {
 	b.WorkerAbs.Init(id, name, freq, network, utxoManager)
 
 	var err error

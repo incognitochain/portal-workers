@@ -21,13 +21,12 @@ type WorkerAbs struct {
 	RPCBTCRelayingReaders []*utils.HttpClient
 	Client                *go_incognito.PublicIncognito
 	Network               string // mainnet, testnet, ...
-	UTXOManager           *utxomanager.UTXOCache
-	Wallet                *go_incognito.Wallet
+	UTXOManager           *utxomanager.UTXOManager
 	Logger                *logrus.Entry
 }
 
 type Worker interface {
-	Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOCache) error
+	Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOManager) error
 	Execute()
 	ExportErrorLog(msg string)
 	ExportInfoLog(msg string)
@@ -38,7 +37,7 @@ type Worker interface {
 	GetNetwork() string
 }
 
-func (a *WorkerAbs) Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOCache) error {
+func (a *WorkerAbs) Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOManager) error {
 	a.ID = id
 	a.Name = name
 	a.Frequency = freq
@@ -67,8 +66,6 @@ func (a *WorkerAbs) Init(id int, name string, freq int, network string, utxoMana
 		os.Getenv("INCOGNITO_COINSERVICE_URL"),
 	)
 	a.Client = publicIncognito
-	blockInfo := go_incognito.NewBlockInfo(publicIncognito)
-	a.Wallet = go_incognito.NewWallet(publicIncognito, blockInfo)
 
 	a.Network = network
 	logger, err := instantiateLogger(a.Name)

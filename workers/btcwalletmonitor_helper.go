@@ -16,19 +16,32 @@ func (b *BTCWalletMonitor) submitShieldingRequest(incAddress string, proof strin
 		"ShieldingProof":  proof,
 	}
 
-	result, err := b.Portal.Shielding(os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata, nil)
+	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), 100)
 	if err != nil {
+		return "", err
+	}
+	utxoKeyImages := []string{}
+	for _, utxo := range utxos {
+		utxoKeyImages = append(utxoKeyImages, utxo.KeyImage)
+	}
+
+	result, err := b.Portal.Shielding(os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata, utxoKeyImages)
+	if err != nil {
+		b.UTXOManager.UncachedUTXOByTmpTxID(tmpTxID)
 		return "", err
 	}
 	resp, err := b.Client.SubmitRawData(result)
 	if err != nil {
+		b.UTXOManager.UncachedUTXOByTmpTxID(tmpTxID)
 		return "", err
 	}
 
 	txID, err := transformer.TransformersTxHash(resp)
 	if err != nil {
+		b.UTXOManager.UncachedUTXOByTmpTxID(tmpTxID)
 		return "", err
 	}
+	b.UTXOManager.UpdateTxID(tmpTxID, txID)
 	return txID, nil
 }
 
