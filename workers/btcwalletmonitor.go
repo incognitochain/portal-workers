@@ -221,17 +221,18 @@ func (b *BTCWalletMonitor) Execute() {
 		var wg sync.WaitGroup
 		for txHash, value := range waitingShieldingList {
 			if value.BTCBlockHeight+BTCConfirmationThreshold-1 <= relayingBTCHeight {
-				// send RPC
-				txID, err := b.submitShieldingRequest(value.IncAddress, value.Proof)
-				if err != nil {
-					b.ExportErrorLog(fmt.Sprintf("Could not send shielding request from BTC tx %v proof with err: %v", txHash, err))
-					continue
-				}
-				fmt.Printf("Shielding txID: %v\n", txID)
 				wg.Add(1)
 				curTxHash := txHash
+				curValue := value
 				go func() {
 					defer wg.Done()
+					// send RPC
+					txID, err := b.submitShieldingRequest(curValue.IncAddress, curValue.Proof)
+					if err != nil {
+						b.ExportErrorLog(fmt.Sprintf("Could not send shielding request from BTC tx %v proof with err: %v", curTxHash, err))
+						return
+					}
+					fmt.Printf("Shielding txID: %v\n", txID)
 					status, errorStr, err := b.getRequestShieldingStatus(txID)
 					if err != nil {
 						b.ExportErrorLog(fmt.Sprintf("Could not get request shielding status from BTC tx %v - with err: %v", curTxHash, err))
