@@ -150,48 +150,36 @@ func (b *BTCBroadcastingManager) getRBFRawTx(
 	feePerRequest := reqTx.NetworkFee
 	acceptableFee := utils.IsEnoughFee(vsize, feePerRequest, numOfRequests, b.bitcoinFee)
 
-	if acceptableFee {
-		params := []interface{}{
-			map[string]string{
-				"TxID": reqTxID,
-			},
-		}
-		var signedRawTxRes entities.SignedRawTxRes
-		err := b.RPCClient.RPCCall("getportalsignedrawreplacebyfeetransaction", params, &signedRawTxRes)
-		if err != nil {
-			b.Logger.Errorf("getportalsignedrawreplacebyfeetransaction: call RPC for ReqTxID %v - with err %v\n", reqTxID, err)
-			return nil, err
-		}
-		if signedRawTxRes.RPCError != nil {
-			b.Logger.Errorf("getportalsignedrawreplacebyfeetransaction: call RPC for ReqTxID %v - with err %v\n", reqTxID, signedRawTxRes.RPCError.StackTrace)
-			return nil, err
-		}
-
-		btcTxContent := signedRawTxRes.Result.SignedTx
-		btcTxHash := signedRawTxRes.Result.TxID
-
-		return &BroadcastTx{
-			TxContent:     btcTxContent,
-			TxHash:        btcTxHash,
-			VSize:         vsize,
-			RBFReqTxID:    reqTxID,
-			FeePerRequest: feePerRequest,
-			NumOfRequests: numOfRequests,
-			IsBroadcasted: true,
-			BlkHeight:     curIncBlkHeight,
-		}, nil
-	} else {
-		return &BroadcastTx{
-			TxContent:     "",
-			TxHash:        "",
-			VSize:         vsize,
-			RBFReqTxID:    reqTxID,
-			FeePerRequest: feePerRequest,
-			NumOfRequests: numOfRequests,
-			IsBroadcasted: false,
-			BlkHeight:     curIncBlkHeight,
-		}, nil
+	params := []interface{}{
+		map[string]string{
+			"TxID": reqTxID,
+		},
 	}
+	var signedRawTxRes entities.SignedRawTxRes
+	err := b.RPCClient.RPCCall("getportalsignedrawreplacebyfeetransaction", params, &signedRawTxRes)
+	if err != nil {
+		b.Logger.Errorf("getportalsignedrawreplacebyfeetransaction: call RPC for ReqTxID %v - with err %v\n", reqTxID, err)
+		return nil, err
+	}
+	if signedRawTxRes.RPCError != nil {
+		b.Logger.Errorf("getportalsignedrawreplacebyfeetransaction: call RPC for ReqTxID %v - with err %v\n", reqTxID, signedRawTxRes.RPCError.StackTrace)
+		return nil, err
+	}
+
+	btcTxContent := signedRawTxRes.Result.SignedTx
+	btcTxHash := signedRawTxRes.Result.TxID
+
+	return &BroadcastTx{
+		TxContent:     btcTxContent,
+		TxHash:        btcTxHash,
+		VSize:         vsize,
+		RBFReqTxID:    reqTxID,
+		FeePerRequest: feePerRequest,
+		NumOfRequests: numOfRequests,
+		IsBroadcasted: acceptableFee,
+		BlkHeight:     curIncBlkHeight,
+	}, nil
+
 }
 
 func (b *BTCBroadcastingManager) getBroadcastTx(

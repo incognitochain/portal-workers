@@ -177,44 +177,42 @@ func (b *BTCBroadcastingManager) Execute() {
 		// submit confirmation requests by checking BTC tx
 		for batchID, txArray := range broadcastTxArray {
 			for _, tx := range txArray {
-				if tx.IsBroadcasted {
-					curBatchID := batchID
-					curTx := tx
+				curBatchID := batchID
+				curTx := tx
 
-					isConfirmed, btcBlockHeight := b.isConfirmedBTCTx(curTx.TxHash)
+				isConfirmed, btcBlockHeight := b.isConfirmedBTCTx(curTx.TxHash)
 
-					if isConfirmed && btcBlockHeight+BTCConfirmationThreshold-1 <= relayingBTCHeight {
-						fmt.Printf("BTC Tx %v is confirmed\n", curTx.TxHash)
+				if isConfirmed && btcBlockHeight+BTCConfirmationThreshold-1 <= relayingBTCHeight {
+					fmt.Printf("BTC Tx %v is confirmed\n", curTx.TxHash)
 
-						// submit confirmed tx
-						wg.Add(1)
-						go func() {
-							defer wg.Done()
+					// submit confirmed tx
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
 
-							// generate BTC proof
-							btcProof, err := utils.BuildProof(b.btcClient, curTx.TxHash, btcBlockHeight)
-							if err != nil {
-								b.ExportErrorLog(fmt.Sprintf("Could not generate BTC proof for batch %v - with err: %v", curBatchID, err))
-								return
+						// generate BTC proof
+						btcProof, err := utils.BuildProof(b.btcClient, curTx.TxHash, btcBlockHeight)
+						if err != nil {
+							b.ExportErrorLog(fmt.Sprintf("Could not generate BTC proof for batch %v - with err: %v", curBatchID, err))
+							return
+						}
+						txID, err := b.submitConfirmedTx(btcProof, curBatchID)
+						if err != nil {
+							b.ExportErrorLog(fmt.Sprintf("Could not submit confirmed tx for batch %v - with err: %v", curBatchID, err))
+							return
+						}
+
+						status, err := b.getSubmitConfirmedTxStatus(txID)
+						if err != nil {
+							b.ExportErrorLog(fmt.Sprintf("Could not get submit confirmed tx status for batch %v, txID %v - with err: %v", curBatchID, txID, err))
+						} else {
+							if status == 0 { // rejected
+								b.ExportErrorLog(fmt.Sprintf("Send confirmation failed for batch %v, txID %v", curBatchID, txID))
+							} else { // succeed
+								b.ExportInfoLog(fmt.Sprintf("Send confirmation succeed for batch %v, txID %v", curBatchID, txID))
 							}
-							txID, err := b.submitConfirmedTx(btcProof, curBatchID)
-							if err != nil {
-								b.ExportErrorLog(fmt.Sprintf("Could not submit confirmed tx for batch %v - with err: %v", curBatchID, err))
-								return
-							}
-
-							status, err := b.getSubmitConfirmedTxStatus(txID)
-							if err != nil {
-								b.ExportErrorLog(fmt.Sprintf("Could not get submit confirmed tx status for batch %v, txID %v - with err: %v", curBatchID, txID, err))
-							} else {
-								if status == 0 { // rejected
-									b.ExportErrorLog(fmt.Sprintf("Send confirmation failed for batch %v, txID %v", curBatchID, txID))
-								} else { // succeed
-									b.ExportInfoLog(fmt.Sprintf("Send confirmation succeed for batch %v, txID %v", curBatchID, txID))
-								}
-							}
-						}()
-					}
+						}
+					}()
 				}
 			}
 		}
