@@ -3,6 +3,8 @@ package workers
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -121,6 +123,8 @@ func (b *BTCWalletMonitor) Execute() {
 		btcAddressIndexMapping[instance.BTCAddress] = idx
 	}
 
+	shardID, _ := strconv.Atoi(os.Getenv("SHARD_ID"))
+
 	for {
 		isBTCNodeAlive := getBTCFullnodeStatus(b.btcClient)
 		if !isBTCNodeAlive {
@@ -237,6 +241,10 @@ func (b *BTCWalletMonitor) Execute() {
 					if err != nil {
 						b.ExportErrorLog(fmt.Sprintf("Could not get request shielding status from BTC tx %v - with err: %v", curTxHash, err))
 					} else {
+						ok := isFinalizedTx(b.RPCClient, b.Logger, shardID, txID)
+						if !ok {
+							return
+						}
 						if status == 0 { // rejected
 							if errorStr == "IsExistedProof" {
 								b.ExportErrorLog(fmt.Sprintf("Request shielding failed BTC tx %v, shielding txID %v - duplicated proof", curTxHash, txID))

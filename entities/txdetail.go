@@ -1,7 +1,8 @@
 package entities
 
 type TxDetail struct {
-	IsInBlock bool
+	IsInBlock   bool
+	BlockHeight uint64
 }
 
 type TxDetailRes struct {

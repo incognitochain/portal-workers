@@ -117,7 +117,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		// wait until next blocks available
 		var curIncBlkHeight uint64
 		for {
-			curIncBlkHeight, err = getFinalizedBeaconHeight(b.RPCClient, b.Logger)
+			curIncBlkHeight, err = getFinalizedShardHeight(b.RPCClient, b.Logger, -1)
 			if err != nil {
 				b.ExportErrorLog(fmt.Sprintf("Could not get latest beacon height - with err: %v", err))
 				return

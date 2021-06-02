@@ -3,10 +3,13 @@ package utils
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/incognitochain/portal-workers/entities"
 )
 
 type HttpClient struct {
@@ -81,4 +84,19 @@ func (client *HttpClient) RPCCall(
 
 func (client HttpClient) GetURL() string {
 	return buildHttpServerAddress(client.url, client.protocol, client.host, client.port)
+}
+
+func GetTxByHash(rpcClient *HttpClient, txID string) (*entities.TxDetail, error) {
+	var txByHashRes entities.TxDetailRes
+	params := []interface{}{
+		txID,
+	}
+	err := rpcClient.RPCCall("gettransactionbyhash", params, &txByHashRes)
+	if err != nil {
+		return nil, err
+	}
+	if txByHashRes.RPCError != nil {
+		return nil, errors.New(txByHashRes.RPCError.Message)
+	}
+	return txByHashRes.Result, nil
 }

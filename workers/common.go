@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/rpcclient"
@@ -103,9 +104,9 @@ func getLatestBTCHeightFromIncogWithoutFork(
 	return currentBTCBlkHeight, nil
 }
 
-func getFinalizedBeaconHeight(rpcClient *utils.HttpClient, logger *logrus.Entry) (uint64, error) {
+func getFinalizedShardHeight(rpcClient *utils.HttpClient, logger *logrus.Entry, shardID int) (uint64, error) {
 	params := []interface{}{
-		-1,
+		shardID,
 	}
 	var allViewRes entities.AllViewRes
 	err := rpcClient.RPCCall("getallviewdetail", params, &allViewRes)
@@ -126,6 +127,30 @@ func getFinalizedBeaconHeight(rpcClient *utils.HttpClient, logger *logrus.Entry)
 	}
 
 	return finalViewHeight, nil
+}
+
+func isFinalizedTx(rpcClient *utils.HttpClient, logger *logrus.Entry, shardID int, txID string) bool {
+	for idx := 0; idx < NumGetStatusTries; idx++ {
+		txDetail, err := utils.GetTxByHash(rpcClient, txID)
+		if txDetail == nil && err != nil {
+			time.Sleep(IntervalTries)
+			continue
+		}
+
+		currentFinalizedHeight, err := getFinalizedShardHeight(rpcClient, logger, shardID)
+		if err != nil {
+			time.Sleep(IntervalTries)
+			continue
+		}
+
+		if currentFinalizedHeight >= txDetail.BlockHeight {
+			return true
+		}
+
+		time.Sleep(IntervalTries)
+	}
+
+	return false
 }
 
 func getBatchIDsFromBeaconHeight(height uint64, rpcClient *utils.HttpClient, logger *logrus.Entry) ([]string, error) {

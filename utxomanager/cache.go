@@ -59,7 +59,7 @@ func (c *UTXOManager) uncachedUTXOsByCheckingTxID(publicKey string, rpcClient *u
 		if len(txID) > len(TmpPrefix) && txID[:3] == TmpPrefix {
 			continue
 		}
-		txDetail, err := getTxByHash(rpcClient, txID)
+		txDetail, err := utils.GetTxByHash(rpcClient, txID)
 		// tx was rejected or tx was confirmed
 		if (txDetail == nil && err != nil) || (txDetail.IsInBlock) {
 			delete(cachedUTXOs, txID)
