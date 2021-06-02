@@ -34,22 +34,22 @@ func (b *UnshieldingAlerter) Execute() {
 		var curIncBlkHeight uint64
 		var err error
 		for {
-			curIncBlkHeight, err = getLatestBeaconHeight(b.RPCClient, b.Logger)
+			curIncBlkHeight, err = getFinalizedBeaconHeight(b.RPCClient, b.Logger)
 			if err != nil {
 				b.ExportErrorLog(fmt.Sprintf("Could not get latest beacon height - with err: %v", err))
 				return
 			}
-			if nextBlkHeight < curIncBlkHeight {
+			if nextBlkHeight <= curIncBlkHeight {
 				break
 			}
 			time.Sleep(40 * time.Second)
 		}
 
 		var scannedBlkHeight uint64
-		if nextBlkHeight+UnshieldingBatchTimeoutBlk <= curIncBlkHeight { // load until the final view
+		if nextBlkHeight+UnshieldingBatchTimeoutBlk-1 <= curIncBlkHeight {
 			scannedBlkHeight = nextBlkHeight + UnshieldingBatchTimeoutBlk - 1
 		} else {
-			scannedBlkHeight = curIncBlkHeight - 1
+			scannedBlkHeight = curIncBlkHeight
 		}
 
 		batchIDs, err := getBatchIDsFromBeaconHeight(scannedBlkHeight, b.RPCClient, b.Logger)

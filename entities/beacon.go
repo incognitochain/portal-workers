@@ -1,10 +1,10 @@
 package entities
 
-type BeaconBestState struct {
-	BeaconHeight uint64
+type ViewState struct {
+	Height uint64
 }
 
-type BeaconBestStateRes struct {
+type AllViewRes struct {
 	RPCBaseRes
-	Result *BeaconBestState
+	Result []*ViewState
 }

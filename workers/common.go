@@ -103,19 +103,29 @@ func getLatestBTCHeightFromIncogWithoutFork(
 	return currentBTCBlkHeight, nil
 }
 
-func getLatestBeaconHeight(rpcClient *utils.HttpClient, logger *logrus.Entry) (uint64, error) {
-	params := []interface{}{}
-	var beaconBestStateRes entities.BeaconBestStateRes
-	err := rpcClient.RPCCall("getbeaconbeststate", params, &beaconBestStateRes)
+func getFinalizedBeaconHeight(rpcClient *utils.HttpClient, logger *logrus.Entry) (uint64, error) {
+	params := []interface{}{
+		-1,
+	}
+	var allViewRes entities.AllViewRes
+	err := rpcClient.RPCCall("getallviewdetail", params, &allViewRes)
 	if err != nil {
 		return 0, err
 	}
 
-	if beaconBestStateRes.RPCError != nil {
-		logger.Errorf("getLatestBeaconHeight: call RPC error, %v\n", beaconBestStateRes.RPCError.StackTrace)
-		return 0, errors.New(beaconBestStateRes.RPCError.Message)
+	if allViewRes.RPCError != nil {
+		logger.Errorf("getFinalizedBeaconHeight: call RPC error, %v\n", allViewRes.RPCError.StackTrace)
+		return 0, errors.New(allViewRes.RPCError.Message)
 	}
-	return beaconBestStateRes.Result.BeaconHeight, nil
+
+	finalViewHeight := uint64(0)
+	for _, view := range allViewRes.Result {
+		if finalViewHeight == 0 || view.Height < finalViewHeight {
+			finalViewHeight = view.Height
+		}
+	}
+
+	return finalViewHeight, nil
 }
 
 func getBatchIDsFromBeaconHeight(height uint64, rpcClient *utils.HttpClient, logger *logrus.Entry) ([]string, error) {
