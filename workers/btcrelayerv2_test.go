@@ -18,8 +18,8 @@ func TestRelayBTCBlock(t *testing.T) {
 	os.Setenv("INCOGNITO_HOST", "127.0.0.1")
 	os.Setenv("INCOGNITO_PORT", "9334")
 	os.Setenv("BTC_NETWORK", "test")
-	os.Setenv("BTC_NODE_HOST", "51.161.119.66")
-	os.Setenv("BTC_NODE_PORT", "18443")
+	os.Setenv("BTC_NODE_HOST", "51.161.119.66:18443")
+	os.Setenv("BTC_NODE_HTTPS", "false")
 	os.Setenv("BTC_NODE_USERNAME", "thach")
 	os.Setenv("BTC_NODE_PASSWORD", "deptrai")
 
