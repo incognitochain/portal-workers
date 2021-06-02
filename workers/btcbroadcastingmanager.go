@@ -3,6 +3,8 @@ package workers
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -100,6 +102,8 @@ func (b *BTCBroadcastingManager) Execute() {
 		nextBlkHeight = broadcastTxsDBObject.NextBlkHeight
 		broadcastTxArray = broadcastTxsDBObject.TxArray
 	}
+
+	shardID, _ := strconv.Atoi(os.Getenv("SHARD_ID"))
 
 	for {
 		isBTCNodeAlive := getBTCFullnodeStatus(b.btcClient)
@@ -206,6 +210,10 @@ func (b *BTCBroadcastingManager) Execute() {
 						if err != nil {
 							b.ExportErrorLog(fmt.Sprintf("Could not get submit confirmed tx status for batch %v, txID %v - with err: %v", curBatchID, txID, err))
 						} else {
+							ok := isFinalizedTx(b.RPCClient, b.Logger, shardID, txID)
+							if !ok {
+								return
+							}
 							if status == 0 { // rejected
 								b.ExportErrorLog(fmt.Sprintf("Send confirmation failed for batch %v, txID %v", curBatchID, txID))
 							} else { // succeed
