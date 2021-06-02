@@ -272,6 +272,10 @@ func (b *BTCBroadcastingManager) Execute() {
 					if err != nil {
 						b.ExportErrorLog(fmt.Sprintf("Could not request RBF tx status for batch %v, txID %v - with err: %v", curBatchID, txID, err))
 					} else {
+						ok := isFinalizedTx(b.RPCClient, b.Logger, shardID, txID)
+						if !ok {
+							return
+						}
 						if status == 0 { // rejected
 							b.ExportErrorLog(fmt.Sprintf("Send RBF request failed for batch %v, txID %v", curBatchID, txID))
 						} else {
