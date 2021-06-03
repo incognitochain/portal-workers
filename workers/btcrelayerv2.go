@@ -18,9 +18,8 @@ import (
 )
 
 const (
-	BTCBlockBatchSize   = 10 // BTCBlockBatchSize is BTC block batch size
-	BlockStepBacks      = 8  // BlockStepBacks is number of blocks that the job needs to step back to solve fork situation
-	FrontRelayThreshold = 20 // Max block height that relayer create relay txs to Incog chain compare with current relaying block height
+	BTCBlockBatchSize = 10 // BTCBlockBatchSize is BTC block batch size
+	BlockStepBacks    = 8  // BlockStepBacks is number of blocks that the job needs to step back to solve fork situation
 )
 
 type btcBlockRes struct {
