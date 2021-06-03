@@ -110,7 +110,6 @@ func (b *BTCRelayerV2) Execute() {
 	}
 	b.ExportInfoLog(fmt.Sprintf("Latest BTC block height: %d", latestBTCBlkHeight))
 
-	nextBlkHeight := latestBTCBlkHeight + 1
 	blockQueue := make(chan btcBlockRes, BTCBlockBatchSize)
 	relayingResQueue := make(chan error, BTCBlockBatchSize)
 	for {
@@ -126,10 +125,7 @@ func (b *BTCRelayerV2) Execute() {
 			b.ExportErrorLog(fmt.Sprintf("Could not get latest btc block height from incognito chain - with err: %v", err))
 			return
 		}
-		if nextBlkHeight > latestBTCBlkHeight+FrontRelayThreshold {
-			b.ExportErrorLog("Relaying BTC block heights are too high compare with current relaying best state")
-			nextBlkHeight = latestBTCBlkHeight + 1
-		}
+		nextBlkHeight := latestBTCBlkHeight + 1
 
 		// wait until next BTC blocks available
 		var btcBestHeight int64
@@ -210,7 +206,6 @@ func (b *BTCRelayerV2) Execute() {
 			}
 		}
 
-		nextBlkHeight += batchSize
-		time.Sleep(15 * time.Second)
+		time.Sleep(30 * time.Second)
 	}
 }
