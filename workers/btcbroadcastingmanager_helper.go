@@ -247,7 +247,7 @@ func (b *BTCBroadcastingManager) submitConfirmedTx(proof string, batchID string)
 		"UnshieldProof": proof,
 	}
 
-	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), 100)
+	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), 5000)
 	if err != nil {
 		return "", err
 	}
@@ -308,7 +308,7 @@ func (b *BTCBroadcastingManager) requestFeeReplacement(batchID string, newFee ui
 		"ReplacementFee": fmt.Sprintf("%v", newFee),
 	}
 
-	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), 100)
+	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), 5000)
 	if err != nil {
 		return "", err
 	}

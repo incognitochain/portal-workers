@@ -16,7 +16,7 @@ func (b *BTCWalletMonitor) submitShieldingRequest(incAddress string, proof strin
 		"ShieldingProof":  proof,
 	}
 
-	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), 100)
+	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), 5000)
 	if err != nil {
 		return "", err
 	}
