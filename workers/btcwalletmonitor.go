@@ -19,6 +19,7 @@ import (
 )
 
 const (
+	FirstScannedBTCBlkHeight        = 1
 	TimeoutTrackingInstanceInSecond = int64(365 * 24 * 60 * 60)
 	WalletMonitorDBFileDir          = "db/walletmonitor"
 	WalletMonitorDBObjectName       = "BTCMonitor-LastUpdate"
@@ -40,15 +41,17 @@ type ShieldingMonitoringInfo struct {
 }
 
 type ShieldingRequestInfo struct {
+	TxHash         string
 	IncAddress     string
 	Proof          string
 	BTCBlockHeight uint64
 }
 
 type ShieldingTxArrayObject struct {
-	ShieldingMonitoringList []*ShieldingMonitoringInfo
-	WaitingShieldingList    map[string]*ShieldingRequestInfo // key: txHash
-	LastTimeStampUpdated    int64
+	ShieldingMonitoringList   []*ShieldingMonitoringInfo
+	WaitingShieldingList      map[string]*ShieldingRequestInfo // key: proofHash
+	LastTimeStampUpdated      int64
+	LastScannedBTCBlockHeight int64
 }
 
 func (b *BTCWalletMonitor) Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOManager) error {
@@ -100,6 +103,7 @@ func (b *BTCWalletMonitor) Execute() {
 	shieldingMonitoringList := []*ShieldingMonitoringInfo{}
 	waitingShieldingList := map[string]*ShieldingRequestInfo{}
 	lastTimeUpdated := int64(0)
+	lastScannedBTCBlockHeight := int64(FirstScannedBTCBlkHeight - 1)
 
 	// restore data from db
 	lastUpdateBytes, err := b.db.Get([]byte(WalletMonitorDBObjectName), nil)
@@ -109,6 +113,7 @@ func (b *BTCWalletMonitor) Execute() {
 		shieldingMonitoringList = shieldingTxArrayObject.ShieldingMonitoringList
 		waitingShieldingList = shieldingTxArrayObject.WaitingShieldingList
 		lastTimeUpdated = shieldingTxArrayObject.LastTimeStampUpdated
+		lastScannedBTCBlockHeight = shieldingTxArrayObject.LastScannedBTCBlockHeight
 	}
 
 	trackingBTCAddresses := []btcutil.Address{}
@@ -171,11 +176,27 @@ func (b *BTCWalletMonitor) Execute() {
 			time.Sleep(15 * time.Second)
 			continue
 		}
-		listUnspentResults, err := b.btcClient.ListUnspentMinMaxAddresses(BTCConfirmationThreshold, 99999999, trackingBTCAddresses)
+
+		btcBestBlockHeight, err := b.btcClient.GetBlockCount()
+		if err != nil {
+			b.ExportErrorLog(fmt.Sprintf("Could not get BTC best block height - with err: %v", err))
+			return
+		}
+		minConfirmation := BTCConfirmationThreshold
+		// Over confirmation just for sure
+		maxConfirmation := int(btcBestBlockHeight - lastScannedBTCBlockHeight + 30)
+		if maxConfirmation < minConfirmation {
+			maxConfirmation = minConfirmation
+		}
+		listUnspentResults, err := b.btcClient.ListUnspentMinMaxAddresses(minConfirmation, maxConfirmation, trackingBTCAddresses)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not scan list of unspent outcoins - with err: %v", err))
-			continue
+			return
 		}
+		lastScannedBTCBlockHeight = btcBestBlockHeight - int64(minConfirmation) + 1
+
+		var wg sync.WaitGroup
+		shieldingRequestChan := make(chan map[string]*ShieldingRequestInfo, len(listUnspentResults))
 		for _, unspentCoins := range listUnspentResults {
 			btcAddress := unspentCoins.Address
 			idx := btcAddressIndexMapping[btcAddress]
@@ -188,27 +209,44 @@ func (b *BTCWalletMonitor) Execute() {
 			}
 			shieldingMonitoringList[idx].ScannedTxID[txHash] = currentTimeStamp
 
-			txID, _ := chainhash.NewHashFromStr(txHash)
-			tx, _ := b.btcClient.GetRawTransactionVerbose(txID)
-			blkHash, _ := chainhash.NewHashFromStr(tx.BlockHash)
-			blk, err := b.btcClient.GetBlockHeaderVerbose(blkHash)
-			if err != nil {
-				b.ExportErrorLog(fmt.Sprintf("Could not get block height of block hash: %v - with err: %v", blkHash, err))
-				continue
-			}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
 
-			// generate proof
-			proof, err := utils.BuildProof(b.btcClient, txHash, uint64(blk.Height))
-			if err != nil {
-				b.ExportErrorLog(fmt.Sprintf("Could not build proof for tx: %v - with err: %v", txID, err))
-				continue
-			}
+				txID, _ := chainhash.NewHashFromStr(txHash)
+				tx, _ := b.btcClient.GetRawTransactionVerbose(txID)
+				blkHash, _ := chainhash.NewHashFromStr(tx.BlockHash)
+				blk, err := b.btcClient.GetBlockHeaderVerbose(blkHash)
+				if err != nil {
+					b.ExportErrorLog(fmt.Sprintf("Could not get block height of block hash: %v for txID: %v - with err: %v", blkHash, txID, err))
+					return
+				}
 
-			fmt.Printf("Found shielding request for address %v, with BTC tx %v\n", incAddress, txID)
-			waitingShieldingList[txHash] = &ShieldingRequestInfo{
-				IncAddress:     incAddress,
-				Proof:          proof,
-				BTCBlockHeight: uint64(blk.Height),
+				// generate proof
+				proof, err := utils.BuildProof(b.btcClient, txHash, uint64(blk.Height))
+				if err != nil {
+					b.ExportErrorLog(fmt.Sprintf("Could not build proof for tx: %v - with err: %v", txHash, err))
+					return
+				}
+
+				fmt.Printf("Found shielding request for address %v, with BTC tx %v\n", incAddress, txHash)
+				proofHash := hashProof(proof, incAddress)
+				shieldingRequestChan <- map[string]*ShieldingRequestInfo{
+					proofHash: {
+						TxHash:         txHash,
+						IncAddress:     incAddress,
+						Proof:          proof,
+						BTCBlockHeight: uint64(blk.Height),
+					},
+				}
+			}()
+		}
+		wg.Wait()
+
+		close(shieldingRequestChan)
+		for shieldRequest := range shieldingRequestChan {
+			for key, value := range shieldRequest {
+				waitingShieldingList[key] = value
 			}
 		}
 
@@ -222,11 +260,11 @@ func (b *BTCWalletMonitor) Execute() {
 		fmt.Printf("Number of shielding monitoring instances: %v\n", len(shieldingMonitoringList))
 
 		sentShieldingRequest := make(chan string, len(waitingShieldingList))
-		var wg sync.WaitGroup
-		for txHash, value := range waitingShieldingList {
+		for proofHash, value := range waitingShieldingList {
 			if value.BTCBlockHeight+BTCConfirmationThreshold-1 <= relayingBTCHeight {
 				wg.Add(1)
-				curTxHash := txHash
+				curProofHash := proofHash
+				curTxHash := value.TxHash
 				curValue := value
 				go func() {
 					defer wg.Done()
@@ -248,13 +286,13 @@ func (b *BTCWalletMonitor) Execute() {
 						if status == 0 { // rejected
 							if errorStr == "IsExistedProof" {
 								b.ExportErrorLog(fmt.Sprintf("Request shielding failed BTC tx %v, shielding txID %v - duplicated proof", curTxHash, txID))
-								sentShieldingRequest <- curTxHash
+								sentShieldingRequest <- curProofHash
 							} else {
 								b.ExportErrorLog(fmt.Sprintf("Request shielding failed BTC tx %v, shielding txID %v - invalid proof", curTxHash, txID))
 							}
 						} else {
 							b.ExportInfoLog(fmt.Sprintf("Request shielding succeed BTC tx %v, shielding txID %v", curTxHash, txID))
-							sentShieldingRequest <- curTxHash
+							sentShieldingRequest <- curProofHash
 						}
 
 					}
@@ -264,14 +302,15 @@ func (b *BTCWalletMonitor) Execute() {
 		wg.Wait()
 
 		close(sentShieldingRequest)
-		for txHash := range sentShieldingRequest {
-			delete(waitingShieldingList, txHash)
+		for proofHash := range sentShieldingRequest {
+			delete(waitingShieldingList, proofHash)
 		}
 
 		shieldingTxArrayObjectBytes, _ := json.Marshal(&ShieldingTxArrayObject{
-			ShieldingMonitoringList: shieldingMonitoringList,
-			WaitingShieldingList:    waitingShieldingList,
-			LastTimeStampUpdated:    lastTimeUpdated,
+			ShieldingMonitoringList:   shieldingMonitoringList,
+			WaitingShieldingList:      waitingShieldingList,
+			LastTimeStampUpdated:      lastTimeUpdated,
+			LastScannedBTCBlockHeight: lastScannedBTCBlockHeight,
 		})
 		err = b.db.Put([]byte(WalletMonitorDBObjectName), shieldingTxArrayObjectBytes, nil)
 		if err != nil {

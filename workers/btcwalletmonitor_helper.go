@@ -1,10 +1,12 @@
 package workers
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
 
+	"github.com/inc-backend/go-incognito/common"
 	"github.com/inc-backend/go-incognito/publish/transformer"
 	"github.com/incognitochain/portal-workers/entities"
 )
@@ -73,4 +75,20 @@ func (b *BTCWalletMonitor) getRequestShieldingStatus(txID string) (int, string, 
 func (b *BTCWalletMonitor) getTrackingInstance(from int64, to int64) ([]*ShieldingMonitoringInfo, error) {
 	// TODO
 	return []*ShieldingMonitoringInfo{}, nil
+}
+
+// hashProof returns the hash of shielding proof (include tx proof and user inc address)
+func hashProof(proof string, incAddressStr string) string {
+	type shieldingProof struct {
+		Proof      string
+		IncAddress string
+	}
+
+	shieldProof := shieldingProof{
+		Proof:      proof,
+		IncAddress: incAddressStr,
+	}
+	shieldProofBytes, _ := json.Marshal(shieldProof)
+	hash := common.HashB(shieldProofBytes)
+	return fmt.Sprintf("%x", hash[:])
 }
