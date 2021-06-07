@@ -3,9 +3,6 @@ package utxomanager
 import (
 	"fmt"
 
-	"github.com/inc-backend/go-incognito/common"
-	"github.com/inc-backend/go-incognito/common/base58"
-	"github.com/inc-backend/go-incognito/wallet"
 	"github.com/incognitochain/portal-workers/utils"
 )
 
@@ -68,41 +65,49 @@ func (c *UTXOManager) uncachedUTXOsByCheckingTxID(publicKey string, rpcClient *u
 	c.Caches[publicKey] = cachedUTXOs
 }
 
-func (c *UTXOManager) UpdateTxID(tmpTxID string, txID string) {
+func (c *UTXOManager) UpdateTxID(privateKey string, tmpTxID string, txID string) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
-	val, isExisted := c.Caches[tmpTxID]
-	if isExisted {
-		delete(c.Caches, tmpTxID)
-		c.Caches[txID] = val
+	publicKey, err := getPublicKeyStr(privateKey)
+	if err != nil {
+		return
 	}
+
+	cachedUTXOs := c.getCachedUTXOByPublicKey(publicKey)
+	val, isExisted := cachedUTXOs[tmpTxID]
+	if isExisted {
+		delete(cachedUTXOs, tmpTxID)
+		cachedUTXOs[txID] = val
+	}
+	c.Caches[publicKey] = cachedUTXOs
 }
 
-func (c *UTXOManager) UncachedUTXOByTmpTxID(tmpTxID string) {
+func (c *UTXOManager) UncachedUTXOByTmpTxID(privateKey string, tmpTxID string) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
-	_, isExisted := c.Caches[tmpTxID]
-	if isExisted {
-		delete(c.Caches, tmpTxID)
+	publicKey, err := getPublicKeyStr(privateKey)
+	if err != nil {
+		return
 	}
+
+	cachedUTXOs := c.getCachedUTXOByPublicKey(publicKey)
+	_, isExisted := cachedUTXOs[tmpTxID]
+	if isExisted {
+		delete(cachedUTXOs, tmpTxID)
+	}
+	c.Caches[publicKey] = cachedUTXOs
 }
 
 func (c *UTXOManager) GetUTXOsByAmount(privateKey string, amount uint64) ([]UTXO, string, error) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
-	keyWallet, err := wallet.Base58CheckDeserialize(privateKey)
+	publicKey, err := getPublicKeyStr(privateKey)
 	if err != nil {
-		return []UTXO{}, "", fmt.Errorf("Can not deserialize private key %v\n", err)
+		return []UTXO{}, "", err
 	}
-	err = keyWallet.KeySet.InitFromPrivateKey(&keyWallet.KeySet.PrivateKey)
-	if err != nil {
-		return []UTXO{}, "", fmt.Errorf("sender private key is invalid")
-	}
-	publicKeyBytes := keyWallet.KeySet.PaymentAddress.Pk
-	publicKey := base58.Base58Check{}.Encode(publicKeyBytes, common.ZeroByte)
 
 	rescan := true
 	_, isExisted := c.Unspent[publicKey]
@@ -145,16 +150,10 @@ func (c *UTXOManager) CacheUTXOsByTxID(privateKey string, txID string, utxos []U
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
-	keyWallet, err := wallet.Base58CheckDeserialize(privateKey)
+	publicKey, err := getPublicKeyStr(privateKey)
 	if err != nil {
 		return
 	}
-	err = keyWallet.KeySet.InitFromPrivateKey(&keyWallet.KeySet.PrivateKey)
-	if err != nil {
-		return
-	}
-	publicKeyBytes := keyWallet.KeySet.PaymentAddress.Pk
-	publicKey := base58.Base58Check{}.Encode(publicKeyBytes, common.ZeroByte)
 
 	cachedUTXOs := c.getCachedUTXOByPublicKey(publicKey)
 	cachedUTXOs[txID] = utxos
@@ -165,16 +164,10 @@ func (c *UTXOManager) GetListUnspentUTXO(privateKey string) ([]UTXO, error) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
-	keyWallet, err := wallet.Base58CheckDeserialize(privateKey)
+	publicKey, err := getPublicKeyStr(privateKey)
 	if err != nil {
-		return []UTXO{}, fmt.Errorf("Can not deserialize private key %v\n", err)
+		return []UTXO{}, err
 	}
-	err = keyWallet.KeySet.InitFromPrivateKey(&keyWallet.KeySet.PrivateKey)
-	if err != nil {
-		return []UTXO{}, fmt.Errorf("sender private key is invalid")
-	}
-	publicKeyBytes := keyWallet.KeySet.PaymentAddress.Pk
-	publicKey := base58.Base58Check{}.Encode(publicKeyBytes, common.ZeroByte)
 
 	c.uncachedUTXOsByCheckingTxID(publicKey, c.RPCClient)
 	utxos, err := getListUTXOs(c.Wallet, privateKey)

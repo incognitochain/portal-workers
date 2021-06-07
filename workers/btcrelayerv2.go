@@ -76,23 +76,23 @@ func (b *BTCRelayerV2) relayBTCBlockToIncognito(btcBlockHeight int64, msgBlk *wi
 	)
 
 	if err != nil {
-		b.UTXOManager.UncachedUTXOByTmpTxID(tmpTxID)
+		b.UTXOManager.UncachedUTXOByTmpTxID(os.Getenv("INCOGNITO_PRIVATE_KEY"), tmpTxID)
 		return err
 	}
 
 	resp, err := b.Client.SubmitRawData(result)
 	if err != nil {
-		b.UTXOManager.UncachedUTXOByTmpTxID(tmpTxID)
+		b.UTXOManager.UncachedUTXOByTmpTxID(os.Getenv("INCOGNITO_PRIVATE_KEY"), tmpTxID)
 		return err
 	}
 
 	txID, err := transformer.TransformersTxHash(resp)
 	if err != nil {
-		b.UTXOManager.UncachedUTXOByTmpTxID(tmpTxID)
+		b.UTXOManager.UncachedUTXOByTmpTxID(os.Getenv("INCOGNITO_PRIVATE_KEY"), tmpTxID)
 		return err
 	}
 
-	b.UTXOManager.UpdateTxID(tmpTxID, txID)
+	b.UTXOManager.UpdateTxID(os.Getenv("INCOGNITO_PRIVATE_KEY"), tmpTxID, txID)
 
 	b.ExportInfoLog(fmt.Sprintf("relayBTCBlockToIncognito success (%d) with TxID: %v\n", btcBlockHeight, txID))
 	fmt.Printf("Relaying block %v, TxID: %v\n", btcBlockHeight, txID)
