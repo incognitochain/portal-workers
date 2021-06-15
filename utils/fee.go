@@ -11,15 +11,15 @@ const (
 	DEFAULT_RATE_INCREASING_STEP = 1.15
 )
 
-type FeeAPIResponseBody struct {
-	FastestFee  uint `json:"fastestFee"`
-	HalfHourFee uint `json:"halfHourFee"`
-	HourFee     uint `json:"hourFee"`
+type BlockCypherFeeResponse struct {
+	HighFee   uint `json:"high_fee_per_kb"`
+	MediumFee uint `json:"medium_fee_per_kb"`
+	LowFee    uint `json:"low_fee_per_kb"`
 }
 
 // Get fee in the current bitcoin condition (satoshi / vbyte)
 func GetCurrentRelayingFee() (uint, error) {
-	response, err := http.Get("https://bitcoinfees.earn.com/api/v1/fees/recommended")
+	response, err := http.Get("https://api.blockcypher.com/v1/btc/main")
 	if err != nil {
 		return 0, err
 	}
@@ -27,13 +27,14 @@ func GetCurrentRelayingFee() (uint, error) {
 	if err != nil {
 		return 0, err
 	}
-	var responseBody FeeAPIResponseBody
+	var responseBody BlockCypherFeeResponse
 	err = json.Unmarshal(responseData, &responseBody)
 	if err != nil {
 		return 0, err
 	}
+	feePerVByte := float64(responseBody.MediumFee) / 1024
 
-	return responseBody.FastestFee, nil
+	return uint(feePerVByte), nil
 }
 
 // Get new fee per request (nano pToken)
