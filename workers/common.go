@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/incognitochain/go-incognito-sdk-v2/incclient"
 	"github.com/incognitochain/portal-workers/entities"
 	"github.com/incognitochain/portal-workers/utils"
 	"github.com/sirupsen/logrus"
@@ -104,15 +106,18 @@ func getLatestBTCHeightFromIncogWithoutFork(
 	return currentBTCBlkHeight, nil
 }
 
-func getFinalizedShardHeight(rpcClient *utils.HttpClient, logger *logrus.Entry, shardID int) (uint64, error) {
+func getFinalizedShardHeight(incClient *incclient.IncClient, logger *logrus.Entry, shardID int) (uint64, error) {
 	params := []interface{}{
 		shardID,
 	}
-	var allViewRes entities.AllViewRes
-	err := rpcClient.RPCCall("getallviewdetail", params, &allViewRes)
+
+	resp, err := incClient.NewRPCCall("1.0", "getallviewdetail", params, 1)
 	if err != nil {
 		return 0, err
 	}
+
+	var allViewRes entities.AllViewRes
+	json.Unmarshal(resp, &allViewRes)
 
 	if allViewRes.RPCError != nil {
 		logger.Errorf("getFinalizedBeaconHeight: call RPC error, %v\n", allViewRes.RPCError.StackTrace)
@@ -129,15 +134,15 @@ func getFinalizedShardHeight(rpcClient *utils.HttpClient, logger *logrus.Entry, 
 	return finalViewHeight, nil
 }
 
-func isFinalizedTx(rpcClient *utils.HttpClient, logger *logrus.Entry, shardID int, txID string) bool {
+func isFinalizedTx(incClient *incclient.IncClient, logger *logrus.Entry, shardID int, txID string) bool {
 	for idx := 0; idx < NumGetStatusTries; idx++ {
-		txDetail, err := utils.GetTxByHash(rpcClient, txID)
-		if txDetail == nil && err != nil {
+		txDetail, err := incClient.GetTxDetail(txID)
+		if err != nil {
 			time.Sleep(IntervalTries)
 			continue
 		}
 
-		currentFinalizedHeight, err := getFinalizedShardHeight(rpcClient, logger, shardID)
+		currentFinalizedHeight, err := getFinalizedShardHeight(incClient, logger, shardID)
 		if err != nil {
 			time.Sleep(IntervalTries)
 			continue

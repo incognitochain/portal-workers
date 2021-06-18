@@ -6,8 +6,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/wire"
-	go_incognito "github.com/inc-backend/go-incognito"
-	"github.com/incognitochain/portal-workers/utils"
+	"github.com/incognitochain/go-incognito-sdk-v2/incclient"
 	"github.com/incognitochain/portal-workers/utxomanager"
 )
 
@@ -23,15 +22,16 @@ func TestRelayBTCBlock(t *testing.T) {
 	os.Setenv("BTC_NODE_USERNAME", "thach")
 	os.Setenv("BTC_NODE_PASSWORD", "deptrai")
 
-	publicIncognito := go_incognito.NewPublicIncognito(
+	incClient, err := incclient.NewIncClient(
 		fmt.Sprintf("%v://%v:%v", os.Getenv("INCOGNITO_PROTOCOL"), os.Getenv("INCOGNITO_HOST"), os.Getenv("INCOGNITO_PORT")),
-		os.Getenv("INCOGNITO_COINSERVICE_URL"),
+		"",
+		2,
 	)
-	blockInfo := go_incognito.NewBlockInfo(publicIncognito)
-	wallet := go_incognito.NewWallet(publicIncognito, blockInfo)
-	httpClient := utils.NewHttpClient("", os.Getenv("INCOGNITO_PROTOCOL"), os.Getenv("INCOGNITO_HOST"), os.Getenv("INCOGNITO_PORT"))
+	if err != nil {
+		panic(fmt.Sprintf("Could not init IncClient: %v\n", err))
+	}
 
-	utxoManager := utxomanager.NewUTXOManager(wallet, httpClient)
+	utxoManager := utxomanager.NewUTXOManager(incClient)
 
 	b := &BTCRelayerV2{}
 	b.Init(3, "BTC Header Relayer", 60, os.Getenv("BTC_NETWORK"), utxoManager)

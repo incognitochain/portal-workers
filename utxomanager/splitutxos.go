@@ -2,13 +2,11 @@ package utxomanager
 
 import (
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
-	go_incognito "github.com/inc-backend/go-incognito"
-	"github.com/inc-backend/go-incognito/publish/transformer"
-	"github.com/incognitochain/portal-workers/utils"
+	"github.com/incognitochain/go-incognito-sdk-v2/coin"
+	"github.com/incognitochain/go-incognito-sdk-v2/incclient"
 )
 
 const (
@@ -18,20 +16,7 @@ const (
 	PRVIDStr      = "0000000000000000000000000000000000000000000000000000000000000004"
 )
 
-func SplitUTXOs(
-	endpointUri string, protocol string, privateKey string, paymentAddress string, minNumUTXOs int,
-	utxoManager *UTXOManager, httpClient *utils.HttpClient,
-) error {
-	publicIncognito := go_incognito.NewPublicIncognito(
-		endpointUri,
-		os.Getenv("INCOGNITO_COINSERVICE_URL"),
-	)
-	blockInfo := go_incognito.NewBlockInfo(publicIncognito)
-	wallet := go_incognito.NewWallet(publicIncognito, blockInfo)
-
-	// rpcClient := httpclient.NewHttpClient(endpointUri, os.Getenv("INCOGNITO_COINSERVICE_URL"), protocol, endpointUri, 0)
-	// txService := services.NewTxService(rpcClient, 2)
-
+func SplitUTXOs(privateKey string, paymentAddress string, minNumUTXOs int, utxoManager *UTXOManager) error {
 	cntLoop := 0
 
 	for {
@@ -53,41 +38,29 @@ func SplitUTXOs(
 		var wg sync.WaitGroup
 		for idx := range utxos {
 			utxo := utxos[idx]
-			if utxo.Amount < MinUTXOAmount*MaxReceiver {
+			if utxo.Coin.GetValue() < MinUTXOAmount*MaxReceiver {
 				continue
 			}
 
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				var receivers map[string]uint64
-				// for idx := 0; idx < MaxReceiver-1; idx++ {
-				// 	otaAddress, _, err := txService.GenerateOTAFromPaymentAddress(paymentAddress)
-				// 	if err != nil {
-				// 		return
-				// 	}
-				// 	receivers[otaAddress] = utxo.Amount / MaxReceiver
-				// }
-				receivers = map[string]uint64{
-					paymentAddress: utxo.Amount / 2,
-				}
-				result, err := wallet.SendPrvWithUTXO(
-					privateKey,
-					receivers,
-					[]string{utxo.KeyImage},
+				receiverList := []string{paymentAddress}
+				amountList := []uint64{utxo.Coin.GetValue() / 2}
+				txFee := uint64(10)
+
+				txParam := incclient.NewTxParam(privateKey, receiverList, amountList, txFee, nil, nil, nil)
+
+				encodedTx, txID, err := utxoManager.IncClient.CreateRawTransactionWithInputCoins(
+					txParam, []coin.PlainCoin{utxo.Coin}, []uint64{utxo.Index.Uint64()},
 				)
 				if err != nil {
 					return
 				}
-				resp, err := publicIncognito.SubmitRawData(result)
+				err = utxoManager.IncClient.SendRawTx(encodedTx)
 				if err != nil {
 					return
 				}
-				txID, err := transformer.TransformersTxHash(resp)
-				if err != nil {
-					return
-				}
-
 				utxoManager.CacheUTXOsByTxID(privateKey, txID, []UTXO{utxo})
 				fmt.Printf("TxID: %+v\n", txID)
 			}()

@@ -12,7 +12,6 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcutil"
-	go_incognito "github.com/inc-backend/go-incognito"
 	"github.com/incognitochain/portal-workers/utils"
 	"github.com/incognitochain/portal-workers/utxomanager"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -27,7 +26,6 @@ const (
 
 type BTCWalletMonitor struct {
 	WorkerAbs
-	Portal    *go_incognito.Portal
 	btcClient *rpcclient.Client
 	chainCfg  *chaincfg.Params
 	db        *leveldb.DB
@@ -56,8 +54,6 @@ type ShieldingTxArrayObject struct {
 
 func (b *BTCWalletMonitor) Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOManager) error {
 	b.WorkerAbs.Init(id, name, freq, network, utxoManager)
-
-	b.Portal = go_incognito.NewPortal(b.Client)
 
 	var err error
 
@@ -279,7 +275,7 @@ func (b *BTCWalletMonitor) Execute() {
 					if err != nil {
 						b.ExportErrorLog(fmt.Sprintf("Could not get request shielding status from BTC tx %v - with err: %v", curTxHash, err))
 					} else {
-						ok := isFinalizedTx(b.RPCClient, b.Logger, shardID, txID)
+						ok := isFinalizedTx(b.UTXOManager.IncClient, b.Logger, shardID, txID)
 						if !ok {
 							return
 						}

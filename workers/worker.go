@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	go_incognito "github.com/inc-backend/go-incognito"
 	"github.com/incognitochain/portal-workers/utils"
 	"github.com/incognitochain/portal-workers/utxomanager"
 	"github.com/sirupsen/logrus"
@@ -19,7 +18,6 @@ type WorkerAbs struct {
 	Quit                  chan bool
 	RPCClient             *utils.HttpClient
 	RPCBTCRelayingReaders []*utils.HttpClient
-	Client                *go_incognito.PublicIncognito
 	Network               string // mainnet, testnet, ...
 	UTXOManager           *utxomanager.UTXOManager
 	Logger                *logrus.Entry
@@ -60,12 +58,6 @@ func (a *WorkerAbs) Init(id int, name string, freq int, network string, utxoMana
 			beaconPorts[i],
 		)) // incognito chain reader rpc
 	}
-
-	publicIncognito := go_incognito.NewPublicIncognito(
-		fmt.Sprintf("%v://%v:%v", os.Getenv("INCOGNITO_PROTOCOL"), os.Getenv("INCOGNITO_HOST"), os.Getenv("INCOGNITO_PORT")),
-		os.Getenv("INCOGNITO_COINSERVICE_URL"),
-	)
-	a.Client = publicIncognito
 
 	a.Network = network
 	logger, err := instantiateLogger(a.Name)

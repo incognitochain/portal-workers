@@ -1,15 +1,16 @@
 package utxomanager
 
 import (
+	"math/big"
 	"sync"
 
-	go_incognito "github.com/inc-backend/go-incognito"
-	"github.com/incognitochain/portal-workers/utils"
+	"github.com/incognitochain/go-incognito-sdk-v2/coin"
+	"github.com/incognitochain/go-incognito-sdk-v2/incclient"
 )
 
 type UTXO struct {
-	KeyImage string
-	Amount   uint64
+	Coin  coin.PlainCoin
+	Index *big.Int
 }
 
 type UTXOManager struct {
@@ -17,16 +18,14 @@ type UTXOManager struct {
 	Caches    map[string]map[string][]UTXO // public key: txID: UTXO
 	mux       sync.Mutex
 	TmpIdx    int
-	Wallet    *go_incognito.Wallet
-	RPCClient *utils.HttpClient
+	IncClient *incclient.IncClient
 }
 
-func NewUTXOManager(w *go_incognito.Wallet, rpcClient *utils.HttpClient) *UTXOManager {
+func NewUTXOManager(incClient *incclient.IncClient) *UTXOManager {
 	return &UTXOManager{
 		Unspent:   map[string][]UTXO{},
 		Caches:    map[string]map[string][]UTXO{},
 		TmpIdx:    0,
-		Wallet:    w,
-		RPCClient: rpcClient,
+		IncClient: incClient,
 	}
 }

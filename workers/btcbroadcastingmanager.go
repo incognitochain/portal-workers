@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/rpcclient"
-	go_incognito "github.com/inc-backend/go-incognito"
 	"github.com/incognitochain/portal-workers/utils"
 	"github.com/incognitochain/portal-workers/utxomanager"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -27,7 +26,6 @@ const (
 
 type BTCBroadcastingManager struct {
 	WorkerAbs
-	Portal     *go_incognito.Portal
 	btcClient  *rpcclient.Client
 	bitcoinFee uint
 	db         *leveldb.DB
@@ -53,8 +51,6 @@ func (b *BTCBroadcastingManager) Init(
 	id int, name string, freq int, network string, utxoManager *utxomanager.UTXOManager,
 ) error {
 	b.WorkerAbs.Init(id, name, freq, network, utxoManager)
-
-	b.Portal = go_incognito.NewPortal(b.Client)
 
 	var err error
 
@@ -121,7 +117,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		// wait until next blocks available
 		var curIncBlkHeight uint64
 		for {
-			curIncBlkHeight, err = getFinalizedShardHeight(b.RPCClient, b.Logger, -1)
+			curIncBlkHeight, err = getFinalizedShardHeight(b.UTXOManager.IncClient, b.Logger, -1)
 			if err != nil {
 				b.ExportErrorLog(fmt.Sprintf("Could not get latest beacon height - with err: %v", err))
 				return
@@ -210,7 +206,7 @@ func (b *BTCBroadcastingManager) Execute() {
 						if err != nil {
 							b.ExportErrorLog(fmt.Sprintf("Could not get submit confirmed tx status for batch %v, txID %v - with err: %v", curBatchID, txID, err))
 						} else {
-							ok := isFinalizedTx(b.RPCClient, b.Logger, shardID, txID)
+							ok := isFinalizedTx(b.UTXOManager.IncClient, b.Logger, shardID, txID)
 							if !ok {
 								return
 							}
@@ -272,7 +268,7 @@ func (b *BTCBroadcastingManager) Execute() {
 					if err != nil {
 						b.ExportErrorLog(fmt.Sprintf("Could not request RBF tx status for batch %v, txID %v - with err: %v", curBatchID, txID, err))
 					} else {
-						ok := isFinalizedTx(b.RPCClient, b.Logger, shardID, txID)
+						ok := isFinalizedTx(b.UTXOManager.IncClient, b.Logger, shardID, txID)
 						if !ok {
 							return
 						}

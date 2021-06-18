@@ -3,23 +3,24 @@ package utxomanager
 import (
 	"fmt"
 
-	go_incognito "github.com/inc-backend/go-incognito"
-	"github.com/inc-backend/go-incognito/common"
-	"github.com/inc-backend/go-incognito/common/base58"
-	"github.com/inc-backend/go-incognito/wallet"
+	"github.com/incognitochain/go-incognito-sdk-v2/common"
+	"github.com/incognitochain/go-incognito-sdk-v2/common/base58"
+	"github.com/incognitochain/go-incognito-sdk-v2/incclient"
+	"github.com/incognitochain/go-incognito-sdk-v2/wallet"
 )
 
-func getListUTXOs(w *go_incognito.Wallet, privateKey string) ([]UTXO, error) {
-	inputCoins, err := w.GetUTXO(privateKey, PRVIDStr)
+func getListUTXOs(incClient *incclient.IncClient, privateKey string) ([]UTXO, error) {
+	inputCoins, idxCoins, err := incClient.GetUnspentOutputCoins(privateKey, PRVIDStr, 0)
+
 	if err != nil {
 		return []UTXO{}, err
 	}
 
 	utxos := []UTXO{}
-	for _, coin := range inputCoins {
+	for idx := range inputCoins {
 		utxos = append(utxos, UTXO{
-			KeyImage: coin.KeyImages,
-			Amount:   coin.Value,
+			Coin:  inputCoins[idx],
+			Index: idxCoins[idx],
 		})
 	}
 	return utxos, nil

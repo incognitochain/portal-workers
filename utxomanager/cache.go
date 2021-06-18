@@ -3,7 +3,9 @@ package utxomanager
 import (
 	"fmt"
 
-	"github.com/incognitochain/portal-workers/utils"
+	"github.com/incognitochain/go-incognito-sdk-v2/common"
+	"github.com/incognitochain/go-incognito-sdk-v2/common/base58"
+	"github.com/incognitochain/go-incognito-sdk-v2/incclient"
 )
 
 const (
@@ -24,7 +26,8 @@ func (c *UTXOManager) getListUTXOKeyImagesWithoutCached(utxos []UTXO, publicKey 
 	cached := map[string]bool{} // key image: interface
 	for _, utxos := range cachedUTXOs {
 		for _, utxo := range utxos {
-			cached[utxo.KeyImage] = true
+			keyImage := base58.Base58Check{}.Encode(utxo.Coin.GetKeyImage().ToBytesS(), common.ZeroByte)
+			cached[keyImage] = true
 		}
 	}
 
@@ -32,7 +35,7 @@ func (c *UTXOManager) getListUTXOKeyImagesWithoutCached(utxos []UTXO, publicKey 
 	idx := 0
 
 	for idx < len(result) {
-		keyImage := result[idx].KeyImage
+		keyImage := base58.Base58Check{}.Encode(result[idx].Coin.GetKeyImage().ToBytesS(), common.ZeroByte)
 		_, isExisted := cached[keyImage]
 		if isExisted {
 			result = append(result[:idx], result[idx+1:]...)
@@ -50,13 +53,14 @@ func (c *UTXOManager) cacheUTXOsByTmpTxID(publicKey string, txID string, utxos [
 	c.Caches[publicKey] = cachedUTXOs
 }
 
-func (c *UTXOManager) uncachedUTXOsByCheckingTxID(publicKey string, rpcClient *utils.HttpClient) {
+func (c *UTXOManager) uncachedUTXOsByCheckingTxID(publicKey string, incClient *incclient.IncClient) {
 	cachedUTXOs := c.getCachedUTXOByPublicKey(publicKey)
 	for txID := range cachedUTXOs {
 		if len(txID) > len(TmpPrefix) && txID[:3] == TmpPrefix {
 			continue
 		}
-		txDetail, err := utils.GetTxByHash(rpcClient, txID)
+
+		txDetail, err := incClient.GetTxDetail(txID)
 		// tx was rejected or tx was confirmed
 		if (txDetail == nil && err != nil) || (txDetail.IsInBlock) {
 			delete(cachedUTXOs, txID)
@@ -114,7 +118,7 @@ func (c *UTXOManager) GetUTXOsByAmount(privateKey string, amount uint64) ([]UTXO
 	if isExisted {
 		sum := uint64(0)
 		for _, utxo := range c.Unspent[publicKey] {
-			sum += utxo.Amount
+			sum += utxo.Coin.GetValue()
 		}
 		if sum >= amount {
 			rescan = false
@@ -122,8 +126,8 @@ func (c *UTXOManager) GetUTXOsByAmount(privateKey string, amount uint64) ([]UTXO
 	}
 
 	if rescan {
-		c.uncachedUTXOsByCheckingTxID(publicKey, c.RPCClient)
-		utxos, err := getListUTXOs(c.Wallet, privateKey)
+		c.uncachedUTXOsByCheckingTxID(publicKey, c.IncClient)
+		utxos, err := getListUTXOs(c.IncClient, privateKey)
 		if err != nil {
 			return []UTXO{}, "", err
 		}
@@ -132,7 +136,7 @@ func (c *UTXOManager) GetUTXOsByAmount(privateKey string, amount uint64) ([]UTXO
 
 	sum := uint64(0)
 	for idx, utxo := range c.Unspent[publicKey] {
-		sum += utxo.Amount
+		sum += utxo.Coin.GetValue()
 		if sum >= amount {
 			utxos := c.Unspent[publicKey][:idx+1]
 			c.TmpIdx = (c.TmpIdx + 1) % 10000
@@ -169,8 +173,8 @@ func (c *UTXOManager) GetListUnspentUTXO(privateKey string) ([]UTXO, error) {
 		return []UTXO{}, err
 	}
 
-	c.uncachedUTXOsByCheckingTxID(publicKey, c.RPCClient)
-	utxos, err := getListUTXOs(c.Wallet, privateKey)
+	c.uncachedUTXOsByCheckingTxID(publicKey, c.IncClient)
+	utxos, err := getListUTXOs(c.IncClient, privateKey)
 	if err != nil {
 		return []UTXO{}, err
 	}

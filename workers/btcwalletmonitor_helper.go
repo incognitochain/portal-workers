@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/inc-backend/go-incognito/common"
-	"github.com/inc-backend/go-incognito/publish/transformer"
+	"github.com/incognitochain/go-incognito-sdk-v2/coin"
+	"github.com/incognitochain/go-incognito-sdk-v2/common"
 	"github.com/incognitochain/portal-workers/entities"
 )
 
@@ -25,33 +25,25 @@ type PortalBackendRes struct {
 }
 
 func (b *BTCWalletMonitor) submitShieldingRequest(incAddress string, proof string) (string, error) {
-	metadata := map[string]interface{}{
-		"IncogAddressStr": incAddress,
-		"TokenID":         BTCID,
-		"ShieldingProof":  proof,
-	}
-
 	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), 5000)
 	if err != nil {
 		return "", err
 	}
-	utxoKeyImages := []string{}
+	utxoCoins := []coin.PlainCoin{}
+	utxoIndices := []uint64{}
 	for _, utxo := range utxos {
-		utxoKeyImages = append(utxoKeyImages, utxo.KeyImage)
+		utxoCoins = append(utxoCoins, utxo.Coin)
+		utxoIndices = append(utxoIndices, utxo.Index.Uint64())
 	}
 
-	result, err := b.Portal.Shielding(os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata, utxoKeyImages)
-	if err != nil {
-		b.UTXOManager.UncachedUTXOByTmpTxID(os.Getenv("INCOGNITO_PRIVATE_KEY"), tmpTxID)
-		return "", err
-	}
-	resp, err := b.Client.SubmitRawData(result)
-	if err != nil {
-		b.UTXOManager.UncachedUTXOByTmpTxID(os.Getenv("INCOGNITO_PRIVATE_KEY"), tmpTxID)
-		return "", err
-	}
-
-	txID, err := transformer.TransformersTxHash(resp)
+	txID, err := b.UTXOManager.IncClient.CreateAndSendPortalShieldTransaction(
+		os.Getenv("INCOGNITO_PRIVATE_KEY"),
+		BTCID,
+		incAddress,
+		proof,
+		utxoCoins,
+		utxoIndices,
+	)
 	if err != nil {
 		b.UTXOManager.UncachedUTXOByTmpTxID(os.Getenv("INCOGNITO_PRIVATE_KEY"), tmpTxID)
 		return "", err

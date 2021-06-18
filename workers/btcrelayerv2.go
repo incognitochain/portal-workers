@@ -8,13 +8,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/incognitochain/go-incognito-sdk-v2/coin"
 	"github.com/incognitochain/portal-workers/utils"
 	"github.com/incognitochain/portal-workers/utxomanager"
 
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/wire"
-	go_incognito "github.com/inc-backend/go-incognito"
-	"github.com/inc-backend/go-incognito/publish/transformer"
 )
 
 const (
@@ -30,14 +29,11 @@ type btcBlockRes struct {
 
 type BTCRelayerV2 struct {
 	WorkerAbs
-	RelayingHeader *go_incognito.RelayingChainHeader
-	btcClient      *rpcclient.Client
+	btcClient *rpcclient.Client
 }
 
 func (b *BTCRelayerV2) Init(id int, name string, freq int, network string, utxoManager *utxomanager.UTXOManager) error {
 	b.WorkerAbs.Init(id, name, freq, network, utxoManager)
-
-	b.RelayingHeader = go_incognito.NewRelayingChainHeader(b.Client)
 
 	var err error
 	// init bitcoin rpcclient
@@ -57,41 +53,29 @@ func (b *BTCRelayerV2) relayBTCBlockToIncognito(btcBlockHeight int64, msgBlk *wi
 	}
 	headerBlockStr := base64.StdEncoding.EncodeToString(msgBlkBytes)
 
-	metadata := map[string]interface{}{
-		"SenderAddress": os.Getenv("INCOGNITO_PAYMENT_ADDRESS"),
-		"Header":        headerBlockStr,
-		"BlockHeight":   fmt.Sprintf("%v", btcBlockHeight),
-	}
-
 	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), 5000)
 	if err != nil {
 		return err
 	}
-	utxoKeyImages := []string{}
+	utxoCoins := []coin.PlainCoin{}
+	utxoIndices := []uint64{}
 	for _, utxo := range utxos {
-		utxoKeyImages = append(utxoKeyImages, utxo.KeyImage)
+		utxoCoins = append(utxoCoins, utxo.Coin)
+		utxoIndices = append(utxoIndices, utxo.Index.Uint64())
 	}
-	result, err := b.RelayingHeader.RelayBTCHeader(
-		os.Getenv("INCOGNITO_PRIVATE_KEY"), metadata, utxoKeyImages,
+
+	txID, err := b.UTXOManager.IncClient.CreateAndSendPortalRelayHeaderTransaction(
+		os.Getenv("INCOGNITO_PRIVATE_KEY"),
+		os.Getenv("INCOGNITO_PAYMENT_ADDRESS"),
+		headerBlockStr,
+		uint64(btcBlockHeight),
+		utxoCoins,
+		utxoIndices,
 	)
-
 	if err != nil {
 		b.UTXOManager.UncachedUTXOByTmpTxID(os.Getenv("INCOGNITO_PRIVATE_KEY"), tmpTxID)
 		return err
 	}
-
-	resp, err := b.Client.SubmitRawData(result)
-	if err != nil {
-		b.UTXOManager.UncachedUTXOByTmpTxID(os.Getenv("INCOGNITO_PRIVATE_KEY"), tmpTxID)
-		return err
-	}
-
-	txID, err := transformer.TransformersTxHash(resp)
-	if err != nil {
-		b.UTXOManager.UncachedUTXOByTmpTxID(os.Getenv("INCOGNITO_PRIVATE_KEY"), tmpTxID)
-		return err
-	}
-
 	b.UTXOManager.UpdateTxID(os.Getenv("INCOGNITO_PRIVATE_KEY"), tmpTxID, txID)
 
 	b.ExportInfoLog(fmt.Sprintf("relayBTCBlockToIncognito success (%d) with TxID: %v\n", btcBlockHeight, txID))

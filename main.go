@@ -8,8 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	go_incognito "github.com/inc-backend/go-incognito"
-	"github.com/incognitochain/portal-workers/utils"
+	"github.com/incognitochain/go-incognito-sdk-v2/incclient"
 	"github.com/incognitochain/portal-workers/utxomanager"
 	"github.com/joho/godotenv"
 )
@@ -43,15 +42,16 @@ func main() {
 		workerIDs = append(workerIDs, workerIDInt)
 	}
 
-	publicIncognito := go_incognito.NewPublicIncognito(
+	incClient, err := incclient.NewIncClient(
 		fmt.Sprintf("%v://%v:%v", os.Getenv("INCOGNITO_PROTOCOL"), os.Getenv("INCOGNITO_HOST"), os.Getenv("INCOGNITO_PORT")),
-		os.Getenv("INCOGNITO_COINSERVICE_URL"),
+		"",
+		2,
 	)
-	blockInfo := go_incognito.NewBlockInfo(publicIncognito)
-	wallet := go_incognito.NewWallet(publicIncognito, blockInfo)
-	httpClient := utils.NewHttpClient("", os.Getenv("INCOGNITO_PROTOCOL"), os.Getenv("INCOGNITO_HOST"), os.Getenv("INCOGNITO_PORT"))
+	if err != nil {
+		panic(fmt.Sprintf("Could not init IncClient: %v\n", err))
+	}
 
-	utxoManager := utxomanager.NewUTXOManager(wallet, httpClient)
+	utxoManager := utxomanager.NewUTXOManager(incClient)
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	s := NewServer(utxoManager, workerIDs)
@@ -62,12 +62,8 @@ func main() {
 		paymentAddress := os.Getenv("INCOGNITO_PAYMENT_ADDRESS")
 		minNumUTXOsStr := os.Getenv("NUMUTXO")
 		minNumUTXOs, _ := strconv.Atoi(minNumUTXOsStr)
-		protocol := os.Getenv("INCOGNITO_PROTOCOL")
-		endpointUri := fmt.Sprintf("%v://%v:%v", os.Getenv("INCOGNITO_PROTOCOL"), os.Getenv("INCOGNITO_HOST"), os.Getenv("INCOGNITO_PORT"))
 
-		err := utxomanager.SplitUTXOs(
-			endpointUri, protocol, privateKey, paymentAddress, minNumUTXOs, utxoManager, httpClient,
-		)
+		err := utxomanager.SplitUTXOs(privateKey, paymentAddress, minNumUTXOs, utxoManager)
 		if err != nil {
 			panic("Could not split UTXOs")
 		}
