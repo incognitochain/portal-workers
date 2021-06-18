@@ -212,8 +212,12 @@ github.com/huin/goupnp v1.0.1-0.20210310174557-0ca763054c88 h1:bcAj8KroPf552TScj
 github.com/huin/goupnp v1.0.1-0.20210310174557-0ca763054c88/go.mod h1:nNs7wvRfN1eKaMknBydLNQU6146XQim8t4h+q90biWo=
 github.com/huin/goutil v0.0.0-20170803182201-1ca381bf3150/go.mod h1:PpLOETDnJ0o3iZrZfqZzyLl6l7F3c6L1oWn7OICBi6o=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
-github.com/incognitochain/go-incognito-sdk-v2 v0.0.0-20210618042131-e762ed48163c h1:pq91i9WpUsd5Hwi4K7Yuq4D8huFAjsunY/Qdqu97+ww=
-github.com/incognitochain/go-incognito-sdk-v2 v0.0.0-20210618042131-e762ed48163c/go.mod h1:yfB2Dq5RNo1F2kKUfQ1pkfDFW0gm2RPFEUPAA95p+8w=
+github.com/incognitochain/go-incognito-sdk-v2 v0.0.0-20210618053301-d474c42d23c0 h1:qI1/c1fwubO/DW7bffzNdOcDZpNXCqPmcDLg9WVIc14=
+github.com/incognitochain/go-incognito-sdk-v2 v0.0.0-20210618053301-d474c42d23c0/go.mod h1:yfB2Dq5RNo1F2kKUfQ1pkfDFW0gm2RPFEUPAA95p+8w=
+github.com/incognitochain/go-incognito-sdk-v2 v0.0.0-20210618053911-719e4c94452e h1:u9YSEX07L/5JHq9BbXO85P129S8pMqLp5mGN4PMp4tw=
+github.com/incognitochain/go-incognito-sdk-v2 v0.0.0-20210618053911-719e4c94452e/go.mod h1:yfB2Dq5RNo1F2kKUfQ1pkfDFW0gm2RPFEUPAA95p+8w=
+github.com/incognitochain/go-incognito-sdk-v2 v0.0.0-20210618072030-2954df9693e5 h1:Jdk1iWaQha7V1FFgfXABdIyBtGYCkTuGmIep/bBC6d0=
+github.com/incognitochain/go-incognito-sdk-v2 v0.0.0-20210618072030-2954df9693e5/go.mod h1:yfB2Dq5RNo1F2kKUfQ1pkfDFW0gm2RPFEUPAA95p+8w=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/influxdata/flux v0.65.1/go.mod h1:J754/zds0vvpfwuq7Gc2wRdVwEodfpCFM7mYlOw2LqY=
 github.com/influxdata/influxdb v1.8.3/go.mod h1:JugdFhsvvI8gadxOI6noqNeeBHvWNTbfYGtiAn+2jhI=
