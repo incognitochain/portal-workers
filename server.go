@@ -59,6 +59,14 @@ func NewServer(utxoManager *utxomanager.UTXOManager, workerIDs []int) *Server {
 		}
 		listWorkers = append(listWorkers, unshieldingAlerterWorker)
 	}
+	if contain(workerIDs, 6) {
+		convertingVaultRequestSender := &workers.BTCConvertVaultRequestSender{}
+		err = convertingVaultRequestSender.Init(6, "Converting Vault Request Sender", 60, os.Getenv("BTC_NETWORK"), utxoManager)
+		if err != nil {
+			panic("Can't init Converting Vault Request Sender")
+		}
+		listWorkers = append(listWorkers, convertingVaultRequestSender)
+	}
 
 	quitChan := make(chan os.Signal, 1)
 	return &Server{

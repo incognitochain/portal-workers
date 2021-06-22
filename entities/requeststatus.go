@@ -18,3 +18,13 @@ type ShieldingRequestStatusRes struct {
 	RPCBaseRes
 	Result *ShieldingRequestStatus
 }
+
+type ConvertingVauleRequestStatus struct {
+	Status   int
+	ErrorMsg string
+}
+
+type ConvertingVauleRequestStatusRes struct {
+	RPCBaseRes
+	Result *ConvertingVauleRequestStatus
+}
