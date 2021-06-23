@@ -71,7 +71,6 @@ func (b *BTCConvertVaultRequestSender) Execute() {
 
 	for {
 		minConfirmation := BTCConfirmationThreshold
-		// Over confirmation just for sure
 		maxConfirmation := 99999999
 		listUnspentResults, err := b.btcClient.ListUnspentMinMaxAddresses(minConfirmation, maxConfirmation, trackingAddresses)
 		if err != nil {
@@ -107,6 +106,8 @@ func (b *BTCConvertVaultRequestSender) Execute() {
 			if blk.Height > curBTCBlockHeight {
 				curBTCBlockHeight = blk.Height
 			}
+
+			fmt.Printf("Create Converting Vault Request for BTC Tx %v\n", txID)
 
 			// Build proof and send request by go routines
 			wg.Add(1)
@@ -150,7 +151,9 @@ func (b *BTCConvertVaultRequestSender) Execute() {
 			}()
 		}
 		wg.Wait()
-		lastScannedBTCBlockHeight = curBTCBlockHeight
+		if curBTCBlockHeight > 0 {
+			lastScannedBTCBlockHeight = curBTCBlockHeight
+		}
 
 		time.Sleep(15 * time.Second)
 	}
