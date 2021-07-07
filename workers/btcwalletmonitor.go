@@ -22,6 +22,7 @@ const (
 	TimeoutTrackingInstanceInSecond = int64(365 * 24 * 60 * 60)
 	WalletMonitorDBFileDir          = "db/walletmonitor"
 	WalletMonitorDBObjectName       = "BTCMonitor-LastUpdate"
+	MinShieldAmount                 = 1000 // nano pBTC
 )
 
 type BTCWalletMonitor struct {
@@ -200,7 +201,7 @@ func (b *BTCWalletMonitor) Execute() {
 
 			txHash := unspentCoins.TxID
 			_, exists := shieldingMonitoringList[idx].ScannedTxID[txHash]
-			if exists {
+			if exists || convertBTCtoNanopBTC(unspentCoins.Amount) < MinShieldAmount {
 				continue
 			}
 			shieldingMonitoringList[idx].ScannedTxID[txHash] = currentTimeStamp

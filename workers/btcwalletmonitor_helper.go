@@ -125,3 +125,7 @@ func hashProof(proof string, incAddressStr string) string {
 	hash := common.HashB(shieldProofBytes)
 	return fmt.Sprintf("%x", hash[:])
 }
+
+func convertBTCtoNanopBTC(amount float64) uint64 {
+	return uint64(amount*1e9 + 0.5)
+}
