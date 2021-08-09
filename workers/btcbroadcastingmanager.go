@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	InitIncBlockBatchSize           = 1000
-	FirstBroadcastTxBlockHeight     = 1
+	InitIncBlockBatchSize           = 100
+	FirstBroadcastTxBlockHeight     = 2932000
 	TimeoutBTCFeeReplacement        = 200
 	TimeIntervalBTCFeeReplacement   = 50
 	ProcessedBlkCacheDepth          = 10000
