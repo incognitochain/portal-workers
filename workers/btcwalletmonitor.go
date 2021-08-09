@@ -152,7 +152,7 @@ func (b *BTCWalletMonitor) Execute() {
 			}
 		}
 
-		for idx, instance := range newlyTrackingInstance {
+		for _, instance := range newlyTrackingInstance {
 			_, exists := btcAddressIndexMapping[instance.BTCAddress]
 			if exists {
 				continue
@@ -166,7 +166,7 @@ func (b *BTCWalletMonitor) Execute() {
 
 			shieldingMonitoringList = append(shieldingMonitoringList, instance)
 			trackingBTCAddresses = append(trackingBTCAddresses, address)
-			btcAddressIndexMapping[instance.BTCAddress] = idx
+			btcAddressIndexMapping[instance.BTCAddress] = len(shieldingMonitoringList) - 1
 		}
 
 		if len(trackingBTCAddresses) == 0 {
