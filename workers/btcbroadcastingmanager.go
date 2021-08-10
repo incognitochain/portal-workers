@@ -20,7 +20,6 @@ const (
 	MaxUnshieldFee                  = 1000000
 	TimeoutBTCFeeReplacement        = 200
 	TimeIntervalBTCFeeReplacement   = 50
-	ProcessedBlkCacheDepth          = 10000
 	BroadcastingManagerDBFileDir    = "db/broadcastingmanager"
 	BroadcastingManagerDBObjectName = "BTCBroadcast-LastUpdate"
 )
@@ -138,7 +137,7 @@ func (b *BTCBroadcastingManager) Execute() {
 
 		fmt.Printf("Next Scan Block Height: %v, Batch Size: %v, Current Finalized Block Height: %v\n", nextBlkHeight, IncBlockBatchSize, curIncBlkHeight)
 
-		batchIDs, err := getBatchIDsFromBeaconHeight(nextBlkHeight+IncBlockBatchSize-1, b.RPCClient, b.Logger)
+		batchIDs, err := getBatchIDsFromBeaconHeight(nextBlkHeight+IncBlockBatchSize-1, b.RPCClient, b.Logger, uint64(FirstBroadcastTxBlockHeight))
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve batches from beacon block %v - with err: %v", nextBlkHeight+IncBlockBatchSize-1, err))
 			return
