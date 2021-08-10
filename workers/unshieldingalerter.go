@@ -52,7 +52,7 @@ func (b *UnshieldingAlerter) Execute() {
 			scannedBlkHeight = curIncBlkHeight
 		}
 
-		batchIDs, err := getBatchIDsFromBeaconHeight(scannedBlkHeight, b.RPCClient, b.Logger)
+		batchIDs, err := getBatchIDsFromBeaconHeight(scannedBlkHeight, b.RPCClient, b.Logger, FirstMonitoringBlkHeight)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve batches from beacon block %v - with err: %v", scannedBlkHeight, err))
 			return
