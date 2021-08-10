@@ -158,7 +158,21 @@ func isFinalizedTx(incClient *incclient.IncClient, logger *logrus.Entry, shardID
 	return false
 }
 
-func getBatchIDsFromBeaconHeight(height uint64, rpcClient *utils.HttpClient, logger *logrus.Entry) ([]string, error) {
+func getFirstBroadcastHeight(batch *entities.ProcessedUnshieldRequestBatch) uint64 {
+	var firstBroadcastHeight uint64
+	for blkHeight := range batch.ExternalFees {
+		if firstBroadcastHeight == 0 {
+			firstBroadcastHeight = blkHeight
+		} else {
+			if firstBroadcastHeight > blkHeight {
+				firstBroadcastHeight = blkHeight
+			}
+		}
+	}
+	return firstBroadcastHeight
+}
+
+func getBatchIDsFromBeaconHeight(height uint64, rpcClient *utils.HttpClient, logger *logrus.Entry, firstScannedBlockHeight uint64) ([]string, error) {
 	batchIDs := []string{}
 
 	params := []interface{}{
@@ -177,7 +191,9 @@ func getBatchIDsFromBeaconHeight(height uint64, rpcClient *utils.HttpClient, log
 	}
 
 	for _, batch := range portalStateRes.Result.ProcessedUnshieldRequests[BTCID] {
-		batchIDs = append(batchIDs, batch.BatchID)
+		if getFirstBroadcastHeight(batch) >= firstScannedBlockHeight {
+			batchIDs = append(batchIDs, batch.BatchID)
+		}
 	}
 	return batchIDs, nil
 }
