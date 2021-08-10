@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	OVERPAYING_RATE              = 1.1
-	DEFAULT_RATE_INCREASING_STEP = 1.15
+	OVERPAYING_RATE              = 1.05
+	DEFAULT_RATE_INCREASING_STEP = 1.09
 )
 
 type BlockCypherFeeResponse struct {

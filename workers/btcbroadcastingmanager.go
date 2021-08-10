@@ -16,7 +16,8 @@ import (
 
 const (
 	InitIncBlockBatchSize           = 100
-	FirstBroadcastTxBlockHeight     = 2932000
+	FirstBroadcastTxBlockHeight     = 2975000
+	MaxUnshieldFee                  = 1000000
 	TimeoutBTCFeeReplacement        = 200
 	TimeIntervalBTCFeeReplacement   = 50
 	ProcessedBlkCacheDepth          = 10000
@@ -256,6 +257,9 @@ func (b *BTCBroadcastingManager) Execute() {
 				go func() {
 					defer wg.Done()
 					newFee := utils.GetNewFee(curTx.VSize, curTx.FeePerRequest, curTx.NumOfRequests, b.bitcoinFee)
+					if newFee > MaxUnshieldFee {
+						return
+					}
 					fmt.Printf("Old fee %v, request new fee %v for batchID %v\n", curTx.FeePerRequest, newFee, curBatchID)
 					// notify the Inc chain for fee replacement
 					txID, err := b.requestFeeReplacement(curBatchID, newFee)
