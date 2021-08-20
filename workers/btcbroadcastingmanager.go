@@ -113,6 +113,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		feeRWLock.RLock()
 		if feePerVByte < 0 {
 			b.ExportErrorLog("Could not get fee from external API")
+			feeRWLock.RUnlock()
 			return
 		}
 		b.bitcoinFee = uint(feePerVByte)
