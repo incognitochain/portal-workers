@@ -97,6 +97,9 @@ func (b *BTCBroadcastingManager) Execute() {
 		json.Unmarshal(lastUpdateBytes, &broadcastTxsDBObject)
 		nextBlkHeight = broadcastTxsDBObject.NextBlkHeight
 		broadcastTxArray = broadcastTxsDBObject.TxArray
+	} else {
+		b.ExportInfoLog(fmt.Sprintf("Could not get last update from db - with err: %v", err))
+		return
 	}
 
 	shardID, _ := strconv.Atoi(os.Getenv("SHARD_ID"))
@@ -119,11 +122,6 @@ func (b *BTCBroadcastingManager) Execute() {
 		}
 		b.bitcoinFee = uint(feePerVByte)
 		feeRWLock.RUnlock()
-
-		if err != nil {
-			b.ExportErrorLog(fmt.Sprintf("Could not get bitcoin fee - with err: %v", err))
-			return
-		}
 
 		// wait until next blocks available
 		var curIncBlkHeight uint64
