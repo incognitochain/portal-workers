@@ -155,7 +155,7 @@ func (b *BTCConvertVaultRequestSender) Execute() {
 			lastScannedBTCBlockHeight = curBTCBlockHeight
 		}
 
-		time.Sleep(15 * time.Second)
+		time.Sleep(100 * time.Second)
 	}
 }
 
