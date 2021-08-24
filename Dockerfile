@@ -17,4 +17,4 @@ WORKDIR /app
 
 COPY --from=build /app/portal-worker /app/portal-worker
 
-CMD [ "./portal-worker" ]
+CMD [ "./portal-worker -config=.env" ]
