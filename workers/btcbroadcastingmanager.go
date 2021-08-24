@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	MaxUnshieldFee                  = 1000000
-	InitIncBlockBatchSize           = 1000
-	FirstBroadcastTxBlockHeight     = 1
+	MaxUnshieldFee                  = 500000
+	InitIncBlockBatchSize           = 100
+	FirstBroadcastTxBlockHeight     = 1425900
 	TimeoutBTCFeeReplacement        = 200
-	TimeIntervalBTCFeeReplacement   = 50
+	TimeIntervalBTCFeeReplacement   = 15
 	BroadcastingManagerDBFileDir    = "db/broadcastingmanager"
 	BroadcastingManagerDBObjectName = "BTCBroadcast-LastUpdate"
 )

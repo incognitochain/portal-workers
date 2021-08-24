@@ -18,11 +18,11 @@ import (
 )
 
 const (
-	FirstScannedBTCBlkHeight        = 1
+	FirstScannedBTCBlkHeight        = 697200
 	TimeoutTrackingInstanceInSecond = int64(365 * 24 * 60 * 60)
 	WalletMonitorDBFileDir          = "db/walletmonitor"
 	WalletMonitorDBObjectName       = "BTCMonitor-LastUpdate"
-	MinShieldAmount                 = 1000 // nano pBTC
+	MinShieldAmount                 = 100000 // nano pBTC
 )
 
 type BTCWalletMonitor struct {

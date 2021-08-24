@@ -2,7 +2,7 @@ package utils
 
 const (
 	OVERPAYING_RATE              = 1.1
-	DEFAULT_RATE_INCREASING_STEP = 1.15
+	DEFAULT_RATE_INCREASING_STEP = 1.23
 )
 
 // Get new fee per request (nano pToken)
