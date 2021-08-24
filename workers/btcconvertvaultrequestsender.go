@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	FirstConvertTxBTCHeight = int32(1)
+	FirstConvertTxBTCHeight = int32(697200)
 )
 
 type BTCConvertVaultRequestSender struct {

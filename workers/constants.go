@@ -3,15 +3,9 @@ package workers
 import "time"
 
 const (
-	// DefaultFee - default fee
-	DefaultFee = 20
-
-	BTCID                    = "ef5947f70ead81a76a53c7c8b7317dd5245510c665d3a13921dc9a581188728b"
+	BTCID                    = "b832e5d3b1f01a4f0623f7fe91d6673461e1f5d37d91fe78c5c2e6183ff39696"
 	BTCConfirmationThreshold = 6
 
 	NumGetStatusTries = 3
 	IntervalTries     = 1 * time.Minute
-
-	PortalReplacementFeeRequestMeta = 255
-	PortalSubmitConfirmedTxMeta     = 256
 )
