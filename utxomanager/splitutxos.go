@@ -47,9 +47,8 @@ func SplitUTXOs(privateKey string, paymentAddress string, minNumUTXOs int, utxoM
 				defer wg.Done()
 				receiverList := []string{paymentAddress}
 				amountList := []uint64{utxo.Coin.GetValue() / 2}
-				txFee := uint64(10)
 
-				txParam := incclient.NewTxParam(privateKey, receiverList, amountList, txFee, nil, nil, nil)
+				txParam := incclient.NewTxParam(privateKey, receiverList, amountList, 0, nil, nil, nil)
 
 				encodedTx, txID, err := utxoManager.IncClient.CreateRawTransactionWithInputCoins(
 					txParam, []coin.PlainCoin{utxo.Coin}, []uint64{utxo.Index.Uint64()},
