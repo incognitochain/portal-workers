@@ -314,6 +314,6 @@ func (b *BTCWalletMonitor) Execute() {
 			b.ExportErrorLog(fmt.Sprintf("Could not save object to db - with err: %v", err))
 			return
 		}
-		time.Sleep(15 * time.Second)
+		time.Sleep(100 * time.Second)
 	}
 }

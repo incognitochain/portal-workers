@@ -310,7 +310,7 @@ func (b *BTCBroadcastingManager) Execute() {
 			return
 		}
 
-		sleepingTime := 10
+		sleepingTime := 100
 		fmt.Printf("Sleeping: %v seconds\n", sleepingTime)
 		time.Sleep(time.Duration(sleepingTime) * time.Second)
 	}
