@@ -98,8 +98,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		nextBlkHeight = broadcastTxsDBObject.NextBlkHeight
 		broadcastTxArray = broadcastTxsDBObject.TxArray
 	} else {
-		b.ExportInfoLog(fmt.Sprintf("Could not get last update from db - with err: %v", err))
-		return
+		b.ExportInfoLog("Restart without DB")
 	}
 
 	shardID, _ := strconv.Atoi(os.Getenv("SHARD_ID"))
