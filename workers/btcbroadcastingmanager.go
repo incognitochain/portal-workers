@@ -18,8 +18,8 @@ const (
 	MaxUnshieldFee                  = 500000
 	InitIncBlockBatchSize           = 100
 	FirstBroadcastTxBlockHeight     = 1427305
-	TimeoutBTCFeeReplacement        = 200
-	TimeIntervalBTCFeeReplacement   = 15
+	TimeoutBTCFeeReplacement        = 80
+	TimeIntervalBTCFeeReplacement   = 10
 	BroadcastingManagerDBFileDir    = "db/broadcastingmanager"
 	BroadcastingManagerDBObjectName = "BTCBroadcast-LastUpdate"
 )
