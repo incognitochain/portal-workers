@@ -22,7 +22,7 @@ func getCurrentRelayingFee() {
 				feeRWLock.Unlock()
 				time.Sleep(3 * time.Minute)
 			}()
-			feePerVByte = 6
+			feePerVByte = 10
 		}()
 	}
 }
