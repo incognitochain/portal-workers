@@ -101,8 +101,6 @@ func (b *BTCBroadcastingManager) Execute() {
 
 	shardID, _ := strconv.Atoi(os.Getenv("SHARD_ID"))
 
-	go getCurrentRelayingFee()
-
 	for {
 		isBTCNodeAlive := getBTCFullnodeStatus(b.btcClient)
 		if !isBTCNodeAlive {
@@ -110,18 +108,15 @@ func (b *BTCBroadcastingManager) Execute() {
 			return
 		}
 
-		feeRWLock.RLock()
-		if feePerVByte < 0 {
-			b.ExportErrorLog("Could not get fee from external API")
-			time.Sleep(3 * time.Minute)
-			feeRWLock.RUnlock()
+		feePerVByte, err := getBitcoinFee()
+		if err != nil {
+			b.ExportErrorLog(fmt.Sprintf("Could not get bitcoin fee, error: %v", err))
 			return
 		}
 		b.bitcoinFee = uint(feePerVByte)
-		feeRWLock.RUnlock()
 
 		fmt.Printf("Current relaying fee: %v\n", b.bitcoinFee)
-		
+
 		// wait until next blocks available
 		var curIncBlkHeight uint64
 		for {

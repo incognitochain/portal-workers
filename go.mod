@@ -7,6 +7,7 @@ require (
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/ebfe/keccak v0.0.0-20150115210727-5cc570678d1b // indirect
 	github.com/ethereum/go-ethereum v1.10.4 // indirect
+	github.com/go-resty/resty/v2 v2.6.0
 	github.com/incognitochain/go-incognito-sdk-v2 v0.0.0-20210622101745-5a0ce96b5bb9
 	github.com/joho/godotenv v1.3.0
 	github.com/sirupsen/logrus v1.7.0
