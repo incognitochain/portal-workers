@@ -1,9 +1,6 @@
 package workers
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"net/http"
 	"sync"
 	"time"
 )
@@ -20,13 +17,13 @@ type BlockCypherFeeResponse struct {
 func getCurrentRelayingFee() {
 	for {
 		func() {
-			response, err := http.Get("https://api.blockcypher.com/v1/btc/main")
+			// response, err := http.Get("https://api.blockcypher.com/v1/btc/main")
 			feeRWLock.Lock()
 			defer func() {
 				feeRWLock.Unlock()
 				time.Sleep(3 * time.Minute)
 			}()
-			if err != nil {
+			/*if err != nil {
 				feePerVByte = -1
 				return
 			}
@@ -45,7 +42,8 @@ func getCurrentRelayingFee() {
 				feePerVByte = -1
 				return
 			}
-			feePerVByte = float64(responseBody.MediumFee) / 1024
+			feePerVByte = float64(responseBody.MediumFee) / 1024 */
+			feePerVByte = 2
 		}()
 	}
 }

@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	FirstScannedBTCBlkHeight        = 2063000
+	FirstScannedBTCBlkHeight        = 2065009
 	TimeoutTrackingInstanceInSecond = int64(365 * 24 * 60 * 60)
 	WalletMonitorDBFileDir          = "db/walletmonitor"
 	WalletMonitorDBObjectName       = "BTCMonitor-LastUpdate"

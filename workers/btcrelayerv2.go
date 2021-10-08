@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	BTCBlockBatchSize = 10 // BTCBlockBatchSize is BTC block batch size
+	BTCBlockBatchSize = 20 // BTCBlockBatchSize is BTC block batch size
 	BlockStepBacks    = 8  // BlockStepBacks is number of blocks that the job needs to step back to solve fork situation
 )
 
@@ -189,6 +189,7 @@ func (b *BTCRelayerV2) Execute() {
 			}
 		}
 
+		fmt.Printf("Sleeping: %v seconds\n", 30)
 		time.Sleep(30 * time.Second)
 	}
 }

@@ -1,5 +1,6 @@
 portal_workers
 logs
 db
-.env_test
-.env_main
+.env_relayer
+.env_shield
+.env_unshield

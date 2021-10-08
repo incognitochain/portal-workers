@@ -22,6 +22,7 @@ func SplitUTXOs(privateKey string, paymentAddress string, minNumUTXOs int, utxoM
 	for {
 		utxos, err := utxoManager.GetListUnspentUTXO(privateKey)
 		if err != nil {
+			fmt.Printf("Error: %v\n", err)
 			return err
 		}
 
@@ -55,10 +56,12 @@ func SplitUTXOs(privateKey string, paymentAddress string, minNumUTXOs int, utxoM
 					txParam, []coin.PlainCoin{utxo.Coin}, []uint64{utxo.Index.Uint64()},
 				)
 				if err != nil {
+					fmt.Printf("Error1: %v\n", err)
 					return
 				}
 				err = utxoManager.IncClient.SendRawTx(encodedTx)
 				if err != nil {
+					fmt.Printf("Error2: %v\n", err)
 					return
 				}
 				utxoManager.CacheUTXOsByTxID(privateKey, txID, []UTXO{utxo})

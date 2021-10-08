@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	InitIncBlockBatchSize           = 100
-	FirstBroadcastTxBlockHeight     = 2975000
-	MaxUnshieldFee                  = 1000000
+	InitIncBlockBatchSize           = 1000
+	FirstBroadcastTxBlockHeight     = 3212167
+	MaxUnshieldFee                  = 500000
 	TimeoutBTCFeeReplacement        = 200
 	TimeIntervalBTCFeeReplacement   = 50
 	BroadcastingManagerDBFileDir    = "db/broadcastingmanager"
@@ -120,11 +120,8 @@ func (b *BTCBroadcastingManager) Execute() {
 		b.bitcoinFee = uint(feePerVByte)
 		feeRWLock.RUnlock()
 
-		if err != nil {
-			b.ExportErrorLog(fmt.Sprintf("Could not get bitcoin fee - with err: %v", err))
-			return
-		}
-
+		fmt.Printf("Current relaying fee: %v\n", b.bitcoinFee)
+		
 		// wait until next blocks available
 		var curIncBlkHeight uint64
 		for {
