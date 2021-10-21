@@ -18,7 +18,7 @@ func GetNewFee(vsize int, oldFeePerUnshieldRequest uint, numberOfUnshieldRequest
 	oldFee := uint64(oldFeePerUnshieldRequest) * uint64(numberOfUnshieldRequest) / 10 // oldFee: satoshi, oldFeePerUnshieldRequest: nano pBTC
 	newFee := uint64(float64(currentRelayingFee) * float64(vsize) * overpayingRate)
 
-	if newFee < oldFee || newFee > uint64(float64(oldFee)*DEFAULT_RATE_INCREASING_STEP) {
+	if newFee <= oldFee || newFee > uint64(float64(oldFee)*DEFAULT_RATE_INCREASING_STEP) {
 		newFee = uint64(float64(oldFee) * DEFAULT_RATE_INCREASING_STEP)
 	}
 	newFeePerUnshieldRequest := uint((newFee-1)/uint64(numberOfUnshieldRequest)+1) * 10 // newFeePerUnshieldRequest: nano pBTC
