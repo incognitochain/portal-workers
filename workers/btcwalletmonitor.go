@@ -273,7 +273,7 @@ func (b *BTCWalletMonitor) Execute() {
 					}
 					txID, err := b.submitShieldingRequest(curValue.IncAddress, curValue.Proof)
 					if err != nil {
-						b.ExportErrorLog(fmt.Sprintf("Could not send shielding request from BTC tx %v proof with err: %v", curTxHash, err))
+						b.ExportErrorLog(fmt.Sprintf("Could not send shielding request from BTC tx %v proof for incAddress %v with err: %v", curTxHash, curValue.IncAddress, err))
 						return
 					}
 					fmt.Printf("Shielding txID: %v\n", txID)
