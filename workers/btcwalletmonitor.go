@@ -1,7 +1,6 @@
 package workers
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -9,7 +8,6 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcutil"
 	"github.com/incognitochain/portal-workers/utils"
@@ -32,24 +30,50 @@ type BTCWalletMonitor struct {
 	db        *leveldb.DB
 }
 
+type ShieldingData struct {
+	// IncAddress is an Incognito payment address associated with the shielding request. It is used in the
+	// old shielding procedure in which BTCAddress is repeated for every shielding request of the same IncAddress.
+	IncAddress string `json:"IncAddress,omitempty"`
+
+	// OTDepositPubKey is a one-time depositing public key associated with the shielding request. It is used to replace
+	// the old shielding procedure and provides better privacy level.
+	// Either IncAddress or OTDepositPubKey must be non-empty.
+	OTDepositPubKey string `json:"OTDepositPubKey,omitempty"`
+
+	// Receivers is a list of OTAReceivers for receiving the shielding assets.
+	// It is only used with OTDepositPubKey.
+	Receivers []string `json:"Receivers,omitempty"`
+
+	// Signatures is a list of valid signatures signed on each OTAReceiver against the OTDepositPubKey.
+	// It is only used with OTDepositPubKey.
+	Signatures []string `json:"Signatures,omitempty"`
+}
+
 type ShieldingMonitoringInfo struct {
-	IncAddress  string
-	BTCAddress  string
-	TimeStamp   int64
+	ShieldingData
+
+	// BTCAddress is the multi-sig address for receiving public token. It is generated based on either IncAddress or
+	// OTDepositPubKey.
+	BTCAddress string `json:"BTCAddress"`
+
+	// TimeStamp is the initializing time of the request.
+	TimeStamp int64 `json:"TimeStamp"`
+
+	// ScannedTxID mapping (from txHash -> timeStamp) associated with the BTCAddress.
 	ScannedTxID map[string]int64
 }
 
 type ShieldingRequestInfo struct {
-	TxHash         string
-	IncAddress     string
-	Proof          string
-	BTCBlockHeight uint64
+	ShieldingData
+	TxHash         string `json:"TxHash"`
+	Proof          string `json:"Proof"`
+	BTCBlockHeight uint64 `json:"BTCBlockHeight"`
 }
 
-type ShieldingTxArrayObject struct {
-	ShieldingMonitoringList   []*ShieldingMonitoringInfo
-	WaitingShieldingList      map[string]*ShieldingRequestInfo // key: proofHash
-	LastTimeStampUpdated      int64
+type ShieldingInfoManager struct {
+	MonitoringList            []*ShieldingMonitoringInfo
+	WaitingList               map[string]*ShieldingRequestInfo // key: proofHash
+	LastTimeUpdate            int64
 	LastScannedBTCBlockHeight int64
 }
 
@@ -83,39 +107,22 @@ func (b *BTCWalletMonitor) ExportInfoLog(msg string) {
 	b.WorkerAbs.ExportInfoLog(msg)
 }
 
-// This function will execute a worker that has 2 main tasks:
-// - Monitor Bitcoin multisig wallets that corresponding with Incognito Wallet App users
-// - Send shielding request on behalf of users to Incognito chain
+// Execute has 2 main tasks:
+// - Monitor Bitcoin multi-sig wallets that corresponding with Incognito Wallet App users.
+// - Send shielding request on behalf of users to Incognito chain.
 func (b *BTCWalletMonitor) Execute() {
 	b.ExportErrorLog("BTCWalletMonitor worker is executing...")
-	// init leveldb instance
-	var err error
-	b.db, err = leveldb.OpenFile(WalletMonitorDBFileDir, nil)
+
+	// load the current state
+	m, err := b.loadData()
 	if err != nil {
 		b.ExportErrorLog(fmt.Sprintf("Could not open leveldb storage file - with err: %v", err))
 		return
 	}
-	defer b.db.Close()
-
-	shieldingMonitoringList := []*ShieldingMonitoringInfo{}
-	waitingShieldingList := map[string]*ShieldingRequestInfo{}
-	lastTimeUpdated := int64(0)
-	lastScannedBTCBlockHeight := int64(FirstScannedBTCBlkHeight - 1)
-
-	// restore data from db
-	lastUpdateBytes, err := b.db.Get([]byte(WalletMonitorDBObjectName), nil)
-	if err == nil {
-		var shieldingTxArrayObject *ShieldingTxArrayObject
-		json.Unmarshal(lastUpdateBytes, &shieldingTxArrayObject)
-		shieldingMonitoringList = shieldingTxArrayObject.ShieldingMonitoringList
-		waitingShieldingList = shieldingTxArrayObject.WaitingShieldingList
-		lastTimeUpdated = shieldingTxArrayObject.LastTimeStampUpdated
-		lastScannedBTCBlockHeight = shieldingTxArrayObject.LastScannedBTCBlockHeight
-	}
 
 	trackingBTCAddresses := []btcutil.Address{}
 	btcAddressIndexMapping := map[string]int{}
-	for idx, instance := range shieldingMonitoringList {
+	for idx, instance := range m.MonitoringList {
 		address, err := btcutil.DecodeAddress(instance.BTCAddress, b.chainCfg)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not decode address %v - with err: %v", instance.BTCAddress, err))
@@ -128,6 +135,7 @@ func (b *BTCWalletMonitor) Execute() {
 	shardID, _ := strconv.Atoi(os.Getenv("SHARD_ID"))
 
 	for {
+		// check BTC node alive
 		isBTCNodeAlive := getBTCFullnodeStatus(b.btcClient)
 		if !isBTCNodeAlive {
 			b.ExportErrorLog("Could not connect to BTC full node")
@@ -136,15 +144,15 @@ func (b *BTCWalletMonitor) Execute() {
 
 		// get new rescanning instance from API
 		currentTimeStamp := time.Now().Unix()
-		newlyTrackingInstance, err := b.getTrackingInstance(lastTimeUpdated, currentTimeStamp)
+		newlyTrackingInstance, err := b.getTrackingInstance(m.LastTimeUpdate, currentTimeStamp)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not get tracking instance from API - with err: %v", err))
 			return
 		}
-		lastTimeUpdated = currentTimeStamp
+		m.LastTimeUpdate = currentTimeStamp
 
 		// delete timeout tracking scanned txID
-		for _, instance := range shieldingMonitoringList {
+		for _, instance := range m.MonitoringList {
 			for txID, timestamp := range instance.ScannedTxID {
 				if timestamp+TimeoutTrackingInstanceInSecond < currentTimeStamp {
 					delete(instance.ScannedTxID, txID)
@@ -164,11 +172,10 @@ func (b *BTCWalletMonitor) Execute() {
 				continue
 			}
 
-			shieldingMonitoringList = append(shieldingMonitoringList, instance)
+			m.MonitoringList = append(m.MonitoringList, instance)
 			trackingBTCAddresses = append(trackingBTCAddresses, address)
-			btcAddressIndexMapping[instance.BTCAddress] = len(shieldingMonitoringList) - 1
+			btcAddressIndexMapping[instance.BTCAddress] = len(m.MonitoringList) - 1
 		}
-
 		if len(trackingBTCAddresses) == 0 {
 			time.Sleep(15 * time.Second)
 			continue
@@ -180,8 +187,7 @@ func (b *BTCWalletMonitor) Execute() {
 			return
 		}
 		minConfirmation := BTCConfirmationThreshold
-		// Over confirmation just for sure
-		maxConfirmation := int(btcBestBlockHeight - lastScannedBTCBlockHeight + 30)
+		maxConfirmation := int(btcBestBlockHeight - m.LastScannedBTCBlockHeight + 30) // Over confirmation just for sure
 		if maxConfirmation < minConfirmation {
 			maxConfirmation = minConfirmation
 		}
@@ -190,132 +196,60 @@ func (b *BTCWalletMonitor) Execute() {
 			b.ExportErrorLog(fmt.Sprintf("Could not scan list of unspent outcoins - with err: %v", err))
 			return
 		}
-		lastScannedBTCBlockHeight = btcBestBlockHeight - int64(minConfirmation) + 1
+		m.LastScannedBTCBlockHeight = btcBestBlockHeight - int64(minConfirmation) + 1
 
+		// get shielding request list
 		var wg sync.WaitGroup
 		shieldingRequestChan := make(chan map[string]*ShieldingRequestInfo, len(listUnspentResults))
 		for _, unspentCoins := range listUnspentResults {
 			btcAddress := unspentCoins.Address
 			idx := btcAddressIndexMapping[btcAddress]
-			incAddress := shieldingMonitoringList[idx].IncAddress
+			chainCode := m.MonitoringList[idx].IncAddress
+			if chainCode == "" {
+				chainCode = m.MonitoringList[idx].OTDepositPubKey
+			}
 
 			txHash := unspentCoins.TxID
-			_, exists := shieldingMonitoringList[idx].ScannedTxID[txHash]
+			_, exists := m.MonitoringList[idx].ScannedTxID[txHash]
 			if exists || convertBTCtoNanopBTC(unspentCoins.Amount) < MinShieldAmount {
 				continue
 			}
-			shieldingMonitoringList[idx].ScannedTxID[txHash] = currentTimeStamp
+			m.MonitoringList[idx].ScannedTxID[txHash] = currentTimeStamp
 
 			wg.Add(1)
-			go func() {
-				defer wg.Done()
-
-				txID, _ := chainhash.NewHashFromStr(txHash)
-				tx, _ := b.btcClient.GetRawTransactionVerbose(txID)
-				blkHash, _ := chainhash.NewHashFromStr(tx.BlockHash)
-				blk, err := b.btcClient.GetBlockHeaderVerbose(blkHash)
-				if err != nil {
-					b.ExportErrorLog(fmt.Sprintf("Could not get block height of block hash: %v for txID: %v - with err: %v", blkHash, txID, err))
-					return
-				}
-
-				// generate proof
-				proof, err := utils.BuildProof(b.btcClient, txHash, uint64(blk.Height))
-				if err != nil {
-					b.ExportErrorLog(fmt.Sprintf("Could not build proof for tx: %v - with err: %v", txHash, err))
-					return
-				}
-
-				fmt.Printf("Found shielding request for address %v, with BTC tx %v\n", incAddress, txHash)
-				proofHash := hashProof(proof, incAddress)
-				shieldingRequestChan <- map[string]*ShieldingRequestInfo{
-					proofHash: {
-						TxHash:         txHash,
-						IncAddress:     incAddress,
-						Proof:          proof,
-						BTCBlockHeight: uint64(blk.Height),
-					},
-				}
-			}()
+			go b.buildShieldingRequestInfo(m.MonitoringList[idx], txHash, chainCode, &wg, shieldingRequestChan)
 		}
 		wg.Wait()
-
 		close(shieldingRequestChan)
 		for shieldRequest := range shieldingRequestChan {
 			for key, value := range shieldRequest {
-				waitingShieldingList[key] = value
+				m.WaitingList[key] = value
 			}
 		}
 
-		// send shielding request RPC to Incognito chain
+		// send shielding request transactions to Incognito chain
 		relayingBTCHeight, err := getLatestBTCHeightFromIncog(b.RPCBTCRelayingReaders)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not retrieve Inc relaying BTC block height - with err: %v", err))
 			return
 		}
-		fmt.Printf("Number of waiting shielding requests: %v\n", len(waitingShieldingList))
-		fmt.Printf("Number of shielding monitoring instances: %v\n", len(shieldingMonitoringList))
-
-		sentShieldingRequest := make(chan string, len(waitingShieldingList))
-		for proofHash, value := range waitingShieldingList {
+		fmt.Printf("Number of waiting shielding requests: %v\n", len(m.WaitingList))
+		fmt.Printf("Number of shielding monitoring instances: %v\n", len(m.MonitoringList))
+		shieldingTxChan := make(chan string, len(m.WaitingList))
+		for proofHash, value := range m.WaitingList {
 			if value.BTCBlockHeight+BTCConfirmationThreshold-1 <= relayingBTCHeight {
 				wg.Add(1)
-				curProofHash := proofHash
-				curTxHash := value.TxHash
-				curValue := value
-				go func() {
-					defer wg.Done()
-					// send RPC
-					txID, err := b.submitShieldingRequest(curValue.IncAddress, curValue.Proof)
-					if err != nil {
-						b.ExportErrorLog(fmt.Sprintf("Could not send shielding request from BTC tx %v proof with err: %v", curTxHash, err))
-						return
-					}
-					fmt.Printf("Shielding txID: %v\n", txID)
-					status, errorStr, err := b.getRequestShieldingStatus(txID)
-					if err != nil {
-						b.ExportErrorLog(fmt.Sprintf("Could not get request shielding status from BTC tx %v - with err: %v", curTxHash, err))
-					} else {
-						ok := isFinalizedTx(b.UTXOManager.IncClient, b.Logger, shardID, txID)
-						if !ok {
-							return
-						}
-						if status == 0 { // rejected
-							if errorStr == "IsExistedProof" {
-								b.ExportErrorLog(fmt.Sprintf("Request shielding failed BTC tx %v, shielding txID %v - duplicated proof", curTxHash, txID))
-								sentShieldingRequest <- curProofHash
-							} else {
-								b.ExportErrorLog(fmt.Sprintf("Request shielding failed BTC tx %v, shielding txID %v - invalid proof", curTxHash, txID))
-							}
-						} else {
-							airdropTxID, err := sendAirdropRequest(curValue.IncAddress)
-							if err == nil {
-								b.ExportInfoLog(fmt.Sprintf("Request shielding succeed BTC tx %v, shielding txID %v, airdrop TxID: %v", curTxHash, txID, airdropTxID))
-							} else {
-								b.ExportInfoLog(fmt.Sprintf("Request shielding succeed BTC tx %v, shielding txID %v, airdrop failed - %v", curTxHash, txID, err))
-							}
-
-							sentShieldingRequest <- curProofHash
-						}
-
-					}
-				}()
+				go b.shield(proofHash, value, shardID, &wg, shieldingTxChan)
 			}
 		}
 		wg.Wait()
-
-		close(sentShieldingRequest)
-		for proofHash := range sentShieldingRequest {
-			delete(waitingShieldingList, proofHash)
+		close(shieldingTxChan)
+		for proofHash := range shieldingTxChan {
+			delete(m.WaitingList, proofHash)
 		}
 
-		shieldingTxArrayObjectBytes, _ := json.Marshal(&ShieldingTxArrayObject{
-			ShieldingMonitoringList:   shieldingMonitoringList,
-			WaitingShieldingList:      waitingShieldingList,
-			LastTimeStampUpdated:      lastTimeUpdated,
-			LastScannedBTCBlockHeight: lastScannedBTCBlockHeight,
-		})
-		err = b.db.Put([]byte(WalletMonitorDBObjectName), shieldingTxArrayObjectBytes, nil)
+		// save the state
+		err = b.saveData(m)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not save object to db - with err: %v", err))
 			return
