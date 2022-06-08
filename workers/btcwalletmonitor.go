@@ -266,8 +266,7 @@ func (b *BTCWalletMonitor) Execute() {
 				go func() {
 					defer wg.Done()
 					// send RPC
-					if curTxHash == "5f07c905a3d449e8cb50976a5968571df99be16711e68e69ad056d4f3800057d" || curTxHash == "c7ad72656b636e1c6ae00f1855724cf3d0a14b01a209a6e7a5843a7869816b03" 
-                                        || curTxHash == "a936943e6fccf2843eec4e4421d4549f64a323f68dcfa1df56f75985b54588fb" {
+					if curTxHash == "5f07c905a3d449e8cb50976a5968571df99be16711e68e69ad056d4f3800057d" || curTxHash == "c7ad72656b636e1c6ae00f1855724cf3d0a14b01a209a6e7a5843a7869816b03" || curTxHash == "a936943e6fccf2843eec4e4421d4549f64a323f68dcfa1df56f75985b54588fb" {
 						b.ExportErrorLog(fmt.Sprintf("Ignore shielding BTC TxID: %v", curTxHash))
 						sentShieldingRequest <- curProofHash
 						return
