@@ -18,3 +18,15 @@ type ShieldingRequestStatusRes struct {
 	RPCBaseRes
 	Result *ShieldingRequestStatus
 }
+
+type UnShieldingRequestStatus struct {
+	Status int
+	UnshieldAmount uint64
+}
+
+type UnShieldingRequestStatusRes struct {
+	RPCBaseRes
+	Result *UnShieldingRequestStatus
+}
+
+

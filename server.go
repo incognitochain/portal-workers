@@ -60,6 +60,16 @@ func NewServer(utxoManager *utxomanager.UTXOManager, workerIDs []int) *Server {
 		listWorkers = append(listWorkers, unshieldingAlerterWorker)
 	}
 
+	if contain(workerIDs, 7) {
+		portalVaultMonitorWorker := &workers.PortalVaultMonitor{}
+		err = portalVaultMonitorWorker.Init(7, "Portal Vault Monitor", 60, os.Getenv("BTC_NETWORK"),
+			utxoManager)
+		if err != nil {
+			panic("Can't init Portal Vault Monitor")
+		}
+		listWorkers = append(listWorkers, portalVaultMonitorWorker)
+	}
+
 	quitChan := make(chan os.Signal, 1)
 	return &Server{
 		quit:    quitChan,

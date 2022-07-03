@@ -1,5 +1,7 @@
 portal_workers
+portal-workers
 logs
 db
 .env_test
 .env_main
+.idea/

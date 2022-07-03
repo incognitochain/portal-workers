@@ -41,7 +41,8 @@ func (a *WorkerAbs) Init(id int, name string, freq int, network string, utxoMana
 	a.Frequency = freq
 	a.Quit = make(chan bool)
 
-	a.RPCClient = utils.NewHttpClient("", os.Getenv("INCOGNITO_PROTOCOL"), os.Getenv("INCOGNITO_HOST"), os.Getenv("INCOGNITO_PORT"))
+	a.RPCClient = utils.NewHttpClient("https://mainnet.incognito.org/fullnode", os.Getenv("INCOGNITO_PROTOCOL"),
+		os.Getenv("INCOGNITO_HOST"), os.Getenv("INCOGNITO_PORT"))
 
 	beaconIps := strings.Split(os.Getenv("INCOGNITO_READER_HOST_LIST"), ",")
 	beaconPorts := strings.Split(os.Getenv("INCOGNITO_READER_PORT_LIST"), ",")

@@ -197,3 +197,93 @@ func getBatchIDsFromBeaconHeight(height uint64, rpcClient *utils.HttpClient, log
 	}
 	return batchIDs, nil
 }
+
+func getPortalStateFromBeaconHeight(
+	height uint64, rpcClient *utils.HttpClient, logger *logrus.Entry) (*entities.PortalV4State,	error) {
+	params := []interface{}{
+		map[string]string{
+			"BeaconHeight": strconv.FormatUint(height, 10),
+		},
+	}
+	var portalStateRes entities.PortalV4StateByHeightRes
+	err := rpcClient.RPCCall("getportalv4state", params, &portalStateRes)
+	if err != nil {
+		return nil, err
+	}
+	if portalStateRes.RPCError != nil {
+		logger.Errorf("getportalv4state: call RPC error, %v\n", portalStateRes.RPCError.StackTrace)
+		return nil, errors.New(portalStateRes.RPCError.Message)
+	}
+	return portalStateRes.Result, nil
+}
+
+func getPTokenAmount(rpcClient *utils.HttpClient, logger *logrus.Entry, tokenID string) (uint64, error) {
+	params := []interface{}{
+		map[string]string{},
+	}
+	var bridgeTokenInfoRes entities.BridgeTokenInfoRes
+	err := rpcClient.RPCCall("getallbridgetokens", params, &bridgeTokenInfoRes)
+	if err != nil {
+		return 0, err
+	}
+	if bridgeTokenInfoRes.RPCError != nil {
+		logger.Errorf("getallbridgetokens: call RPC error, %v\n", bridgeTokenInfoRes.RPCError.StackTrace)
+		return 0, errors.New(bridgeTokenInfoRes.RPCError.Message)
+	}
+
+	for _, token := range bridgeTokenInfoRes.Result {
+		if token.TokenID == tokenID {
+			return token.Amount, nil
+		}
+	}
+
+	logger.Errorf("Can not found tokenID %v\n", tokenID)
+	return 0, fmt.Errorf("Can not found tokenID %v\n", tokenID)
+}
+
+func getIncognitoBlockChainInfo(
+	rpcClient *utils.HttpClient, logger *logrus.Entry,
+) (*entities.GetBlockChainInfoResult,
+	error) {
+	params := []interface{}{
+		map[string]string{},
+	}
+	var blockChainInfo entities.GetBlockChainInfoRes
+	err := rpcClient.RPCCall("getblockchaininfo", params, &blockChainInfo)
+	if err != nil {
+		return nil, err
+	}
+	if blockChainInfo.RPCError != nil {
+		logger.Errorf("getblockchaininfo: call RPC error, %v\n", blockChainInfo.RPCError.StackTrace)
+		return nil, errors.New(blockChainInfo.RPCError.Message)
+	}
+	return blockChainInfo.Result, nil
+}
+
+func getRequestUnShieldingStatus(rpcClient *utils.HttpClient, txID string) (*entities.UnShieldingRequestStatus, error) {
+	params := []interface{}{
+		map[string]string{
+			"UnshieldID": txID,
+		},
+	}
+
+	var unshieldReqStatusRes entities.UnShieldingRequestStatusRes
+	err := rpcClient.RPCCall("getportalunshieldrequeststatus", params, &unshieldReqStatusRes)
+	if err != nil {
+		return nil, err
+	}
+	if unshieldReqStatusRes.RPCError != nil {
+		return unshieldReqStatusRes.Result, errors.New(unshieldReqStatusRes.RPCError.Message)
+	}
+	return unshieldReqStatusRes.Result, nil
+}
+
+
+func ConvertBTCExternalToIncAmount(externalAmt uint64) uint64 {
+	return externalAmt * 10
+}
+
+func ConvertBTCIncToExternalAmount(incAmt uint64) uint64 {
+	return incAmt / 10 // incAmt / 10^9 * 10^8
+}
+
