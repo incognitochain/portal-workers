@@ -70,6 +70,16 @@ func NewServer(utxoManager *utxomanager.UTXOManager, workerIDs []int) *Server {
 		listWorkers = append(listWorkers, portalVaultMonitorWorker)
 	}
 
+	if contain(workerIDs, 8) {
+		rescanShieldReqWorker := &workers.RescanShieldReqWorker{}
+		err = rescanShieldReqWorker.Init(7, "Rescan Shield Req Worker", 60, os.Getenv("BTC_NETWORK"),
+			utxoManager)
+		if err != nil {
+			panic("Can't init Rescan Shield Req Worker")
+		}
+		listWorkers = append(listWorkers, rescanShieldReqWorker)
+	}
+
 	quitChan := make(chan os.Signal, 1)
 	return &Server{
 		quit:    quitChan,

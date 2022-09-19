@@ -1,33 +1,11 @@
 package workers
 
 import (
-	"errors"
 	"fmt"
-	"strconv"
 	"testing"
 
-	"github.com/incognitochain/portal-workers/entities"
 	"github.com/incognitochain/portal-workers/utils"
 )
-
-func getPortalState(
-	height uint64, rpcClient *utils.HttpClient) (*entities.PortalV4State, error) {
-	params := []interface{}{
-		map[string]string{
-			"BeaconHeight": strconv.FormatUint(height, 10),
-		},
-	}
-	var portalStateRes entities.PortalV4StateByHeightRes
-	err := rpcClient.RPCCall("getportalv4state", params, &portalStateRes)
-	if err != nil {
-		return nil, err
-	}
-	if portalStateRes.RPCError != nil {
-		// logger.Errorf("getportalv4state: call RPC error, %v\n", portalStateRes.RPCError.StackTrace)
-		return nil, errors.New(portalStateRes.RPCError.Message)
-	}
-	return portalStateRes.Result, nil
-}
 
 func TestCallPortalVault(t *testing.T) {
 	beaconHeight := uint64(2268879)
@@ -37,7 +15,7 @@ func TestCallPortalVault(t *testing.T) {
 
 	// rpcClient := utils.NewHttpClient("https://testnet.incognito.org/fullnode", "", "", "")
 	// btcID := "4584d5e9b2fc0337dfb17f4b5bb025e5b82c38cfa4f54e8a3d4fcdd03954ff82"
-	portalState, err := getPortalState(beaconHeight, rpcClient)
+	portalState, err := GetPortalState(beaconHeight, rpcClient)
 	if err != nil {
 		fmt.Printf("Err: %v\n", err)
 	}
