@@ -2,11 +2,14 @@ package workers
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/incognitochain/go-incognito-sdk-v2/incclient"
 	"github.com/incognitochain/portal-workers/utils"
+	"github.com/incognitochain/portal-workers/utxomanager"
 )
 
 func TestBuildProof(t *testing.T) {
@@ -24,6 +27,7 @@ func TestBuildProof(t *testing.T) {
 	var err error
 	b.btcClient, err = rpcclient.New(connCfg, nil)
 	if err != nil {
+		fmt.Printf("Err1: %v\n", err)
 		t.FailNow()
 	}
 
@@ -31,14 +35,16 @@ func TestBuildProof(t *testing.T) {
 	var btcBlockHeight uint64
 	var btcProof string
 
-	txHash = "9fbfc05bc9359544ff1925ea89812ed81f38353af13f83cd34439f83769c6ba4"
-	btcBlockHeight = 1937581
+	txHash = "01d597399491c026b98256193950318a88adca357c02ecc9d637842a1ed6b438"
+	btcBlockHeight = 752148
+
 	btcProof, err = utils.BuildProof(b.btcClient, txHash, btcBlockHeight)
 	if err != nil {
+		fmt.Printf("Err2: %v\n", err)
 		t.Logf("Gen proof failed - with err: %v", err)
 		return
 	}
-	t.Logf("Proof: %+v", btcProof)
+	fmt.Printf("Proof: %+v\n", btcProof)
 }
 
 func TestEstimateFee(t *testing.T) {
@@ -94,4 +100,96 @@ func TestGetVSizeTx(t *testing.T) {
 	}
 
 	fmt.Printf("Size: %v, VSize: %v\n", len(txContent)/2, size)
+}
+
+func TestImportAddresses(t *testing.T) {
+
+	// b := &BTCBroadcastingManager{}
+	bWallet := &BTCWalletMonitor{}
+	// init bitcoin rpcclient
+	connCfg := &rpcclient.ConnConfig{
+		Host:         fmt.Sprintf("%s:%s", "51.161.119.66", "18443"),
+		User:         "thach",
+		Pass:         "deptrai",
+		HTTPPostMode: true, // Bitcoin core only supports HTTP POST mode
+		DisableTLS:   true, // Bitcoin core does not provide TLS by default
+	}
+
+	var err error
+	bWallet.btcClient, err = rpcclient.New(connCfg, nil)
+	if err != nil {
+		fmt.Printf("Err1: %v\n", err)
+		t.FailNow()
+	}
+
+	os.Setenv("BACKEND_API_HOST", "")
+
+	shieldAddresses, err := bWallet.getTrackingInstance(1577862000, 1661931360)
+	fmt.Printf("Err: %v\n", err)
+	fmt.Printf("Len shielding address: %v\n", len(shieldAddresses))
+
+	countSuccess := 0
+	countFailed := 0
+	for _, a := range shieldAddresses {
+		err := bWallet.btcClient.ImportAddressRescan(a.BTCAddress, "", false)
+		if err != nil {
+			fmt.Printf("Error Import address %v: %v\n", a.BTCAddress, err)
+			countFailed++
+		} else {
+			fmt.Printf("Import address success: %v\n", a.BTCAddress)
+			countSuccess++
+		}
+		// break
+	}
+
+	fmt.Printf("countSuccess: %v\n", countSuccess)
+	fmt.Printf("countFailed: %v\n", countFailed)
+}
+
+func TestRBF(t *testing.T) {
+
+	b := &BTCBroadcastingManager{}
+	// init bitcoin rpcclient
+	connCfg := &rpcclient.ConnConfig{
+		Host:         "",
+		User:         "",
+		Pass:         "",
+		HTTPPostMode: true,  // Bitcoin core only supports HTTP POST mode
+		DisableTLS:   false, // Bitcoin core does not provide TLS by default
+	}
+
+	var err error
+	b.btcClient, err = rpcclient.New(connCfg, nil)
+	if err != nil {
+		fmt.Printf("Err1: %v\n", err)
+		t.FailNow()
+	}
+
+	incClient, err := incclient.NewIncClient(
+		"",
+		"",
+		2,
+	)
+	b.UTXOManager = &utxomanager.UTXOManager{
+		Unspent: map[string][]utxomanager.UTXO{},            // public key: UTXO
+		Caches:  map[string]map[string][]utxomanager.UTXO{}, // public key: txID: UTXO
+	}
+
+	b.UTXOManager.IncClient = incClient
+
+	os.Setenv("BACKEND_API_HOST", "")
+	os.Setenv("INCOGNITO_PRIVATE_KEY", "")
+
+	batchID := "6b013ad37b58109f367228293ace1479d71e00c7a0967f3989f8312ef9fd5d57"
+	newFee := uint(550000)
+
+	txID, err := b.requestFeeReplacement(batchID, newFee)
+
+	if err != nil {
+		fmt.Printf("Error Import address: %v\n", err)
+
+	} else {
+		fmt.Printf("Import address success: %v\n", txID)
+
+	}
 }

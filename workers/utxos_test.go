@@ -30,7 +30,7 @@ func getPortalState(
 }
 
 func TestCallPortalVault(t *testing.T) {
-	beaconHeight := uint64(2099297)
+	beaconHeight := uint64(2268879)
 
 	rpcClient := utils.NewHttpClient("https://mainnet.incognito.org/fullnode", "", "", "")
 	btcID := "b832e5d3b1f01a4f0623f7fe91d6673461e1f5d37d91fe78c5c2e6183ff39696"
