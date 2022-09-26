@@ -109,6 +109,8 @@ func (b *RescanShieldReqWorker) buildProofAndSubmit(utxo btcjson.ListUnspentResu
 		b.ExportErrorLog(fmt.Sprintf("Could not send shielding request from BTC tx %v proof with err: %v", txHash, err))
 		return "", err
 	}
+
+	b.ExportInfoLog(fmt.Sprintf("Shielding TxID %v, with BTC tx %v\n", txShieldID, txHash))
 	return txShieldID, nil
 }
 
@@ -155,6 +157,13 @@ func (b *RescanShieldReqWorker) Execute() {
 		b.ExportErrorLog(fmt.Sprintf("Could not get tracking instance from API - with err: %v", err))
 		return
 	}
+
+	// newlyTrackingInstance := []ShieldingMonitoringInfo{
+	// 	{
+	// 		IncAddress: "12svxAhDa8x9z71FZWc2YMMaH1qHhibJbD2TpVFAetmKYR2R8L211YCEuYyvF7KKkMgJvzoyomiDketLeVrCQ7dSteBGHUNCMwnVjiW2GEohd66n3BW1YXjwhETRfL8HNhqRD8heJcgDBeNgEjsQ",
+	// 		BTCAddress: "bc1qteqsgk5zww955wt0k993h637wml5j5ks7ad4065tdutszw8gyn7s7jlhlk",
+	// 	},
+	// }
 
 	trackingBTCAddresses := []btcutil.Address{}
 	addrMap := map[string]string{} // BTC address => Inc address
