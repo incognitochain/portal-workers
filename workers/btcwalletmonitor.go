@@ -181,7 +181,7 @@ func (b *BTCWalletMonitor) Execute() {
 		}
 		minConfirmation := BTCConfirmationThreshold
 		// Over confirmation just for sure
-		maxConfirmation := int(btcBestBlockHeight - lastScannedBTCBlockHeight + 30)
+		maxConfirmation := int(btcBestBlockHeight - lastScannedBTCBlockHeight + 144)
 		if maxConfirmation < minConfirmation {
 			maxConfirmation = minConfirmation
 		}
