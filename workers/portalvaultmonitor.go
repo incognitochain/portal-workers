@@ -15,8 +15,9 @@ const (
 	PortalVaultMonitorDefaultBeaconHeight = 1427650 // the beacon height that enable portal v4
 	PortalVaultMonitorDBFileDir           = "db/portalvaultmonitor"
 	PortalVaultMonitorDBObjectName        = "PortalVault-LastUpdate"
-	DiffAmount                            = 112569013 // 0.087822078 btc
+	DiffAmount                            = 112569013 // 0.087822078 btc  // diff is because diff before convert vault + fee convert
 	// 112458246
+	AllowDiffAmount = 0.1 * 1e8
 )
 
 type PortalVaultMonitor struct {
@@ -163,9 +164,9 @@ func (b *PortalVaultMonitor) Execute() {
 
 		totalBTCAmount := utxoAmountInVault + changeUtxoAmountInBatchTxs + DiffAmount
 
-		if totalPBTCAmount != totalBTCAmount {
-			fmt.Printf("Beacon height %v: different vault: totalPBTCAmount %v - totalBTCAmount %v\n",
-				beaconHeight, totalPBTCAmount, totalBTCAmount)
+		if totalPBTCAmount > totalBTCAmount+AllowDiffAmount {
+			fmt.Printf("Beacon height %v: different vault: totalPBTCAmount %v - totalBTCAmount %v - diff amount: %v\n",
+				beaconHeight, totalPBTCAmount, totalBTCAmount, totalPBTCAmount - totalBTCAmount)
 			// fmt.Printf("utxoAmountInVault: %v\n", utxoAmountInVault)
 			// fmt.Printf("changeUtxoAmountInBatchTxs: %v\n", changeUtxoAmountInBatchTxs)
 			b.ExportErrorLog(fmt.Sprintf("Beacon height %v: Different vault: totalPBTCAmount %v - totalBTCAmount %v",

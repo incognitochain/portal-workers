@@ -20,13 +20,14 @@ type ShieldingRequestStatusRes struct {
 }
 
 type UnShieldingRequestStatus struct {
-	Status int
+	Status         int
 	UnshieldAmount uint64
+	RemoteAddress  string
+	ExternalTxID   string
+	ExternalFee    uint64
 }
 
 type UnShieldingRequestStatusRes struct {
 	RPCBaseRes
 	Result *UnShieldingRequestStatus
 }
-
-

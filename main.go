@@ -15,7 +15,7 @@ import (
 
 func main() {
 	var envFile string
-	flag.StringVar(&envFile, "config", ".env_dev", ".env config file")
+	flag.StringVar(&envFile, "config", ".env_main", ".env config file")
 	flag.Parse()
 
 	err := godotenv.Load(envFile)
