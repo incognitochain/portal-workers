@@ -38,7 +38,9 @@ func SplitUTXOs(privateKey string, paymentAddress string, minNumUTXOs int, utxoM
 		var wg sync.WaitGroup
 		for idx := range utxos {
 			utxo := utxos[idx]
+			fmt.Printf("UTXO Value: %v\n", utxo.Coin.GetValue())
 			if utxo.Coin.GetValue() < MinUTXOAmount*MaxReceiver {
+				fmt.Printf("Skipped\n")
 				continue
 			}
 
@@ -47,18 +49,19 @@ func SplitUTXOs(privateKey string, paymentAddress string, minNumUTXOs int, utxoM
 				defer wg.Done()
 				receiverList := []string{paymentAddress}
 				amountList := []uint64{utxo.Coin.GetValue() / 2}
-				txFee := uint64(10)
 
-				txParam := incclient.NewTxParam(privateKey, receiverList, amountList, txFee, nil, nil, nil)
+				txParam := incclient.NewTxParam(privateKey, receiverList, amountList, 0, nil, nil, nil)
 
 				encodedTx, txID, err := utxoManager.IncClient.CreateRawTransactionWithInputCoins(
 					txParam, []coin.PlainCoin{utxo.Coin}, []uint64{utxo.Index.Uint64()},
 				)
 				if err != nil {
+					fmt.Printf("CreateRawTransactionWithInputCoins error: %v\n", err)
 					return
 				}
 				err = utxoManager.IncClient.SendRawTx(encodedTx)
 				if err != nil {
+					fmt.Printf("SendRawTx error: %v\n", err)
 					return
 				}
 				utxoManager.CacheUTXOsByTxID(privateKey, txID, []UTXO{utxo})

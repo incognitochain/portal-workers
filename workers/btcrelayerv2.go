@@ -189,6 +189,6 @@ func (b *BTCRelayerV2) Execute() {
 			}
 		}
 
-		time.Sleep(30 * time.Second)
+		time.Sleep(100 * time.Second)
 	}
 }

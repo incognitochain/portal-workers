@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	resty "github.com/go-resty/resty/v2"
 	"github.com/incognitochain/go-incognito-sdk-v2/coin"
 	"github.com/incognitochain/go-incognito-sdk-v2/common"
 	"github.com/incognitochain/portal-workers/entities"
@@ -22,6 +23,20 @@ type PortalAddressInstance struct {
 type PortalBackendRes struct {
 	Result []*PortalAddressInstance
 	Error  interface{}
+}
+
+type AirdropRequest struct {
+	PaymentAddress string `json:"paymentaddress"`
+}
+
+type ErrorInfo struct {
+	Code int    `json:"Code"`
+	Msg  string `json:"Msg"`
+}
+
+type AirdropResponse struct {
+	Error  *ErrorInfo `json:"Error"`
+	Result string     `json:"Result"`
 }
 
 func (b *BTCWalletMonitor) submitShieldingRequest(incAddress string, proof string) (string, error) {
@@ -128,4 +143,28 @@ func hashProof(proof string, incAddressStr string) string {
 
 func convertBTCtoNanopBTC(amount float64) uint64 {
 	return uint64(amount*1e9 + 0.5)
+}
+
+func sendAirdropRequest(incAddress string) (string, error) {
+	client := resty.New()
+
+	response, err := client.R().
+		SetBody(AirdropRequest{PaymentAddress: incAddress}).
+		Post(os.Getenv("AIRDROP_PRV_HOST"))
+
+	if err != nil {
+		return "", err
+	}
+	if response.StatusCode() != 200 {
+		return "", fmt.Errorf("Response status code: %v", response.StatusCode())
+	}
+	var responseBody AirdropResponse
+	err = json.Unmarshal(response.Body(), &responseBody)
+	if err != nil {
+		return "", fmt.Errorf("Could not parse response: %v", response.Body())
+	}
+	if responseBody.Error != nil {
+		return "", fmt.Errorf("Error: %v", responseBody.Error)
+	}
+	return responseBody.Result, nil
 }

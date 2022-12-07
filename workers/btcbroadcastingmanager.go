@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	MaxUnshieldFee                  = 1000000
-	InitIncBlockBatchSize           = 1000
-	FirstBroadcastTxBlockHeight     = 1
-	TimeoutBTCFeeReplacement        = 200
-	TimeIntervalBTCFeeReplacement   = 50
+	MaxUnshieldFee                  = 500000
+	InitIncBlockBatchSize           = 100
+	FirstBroadcastTxBlockHeight     = 1427305
+	TimeoutBTCFeeReplacement        = 80
+	TimeIntervalBTCFeeReplacement   = 10
 	BroadcastingManagerDBFileDir    = "db/broadcastingmanager"
 	BroadcastingManagerDBObjectName = "BTCBroadcast-LastUpdate"
 )
@@ -97,11 +97,11 @@ func (b *BTCBroadcastingManager) Execute() {
 		json.Unmarshal(lastUpdateBytes, &broadcastTxsDBObject)
 		nextBlkHeight = broadcastTxsDBObject.NextBlkHeight
 		broadcastTxArray = broadcastTxsDBObject.TxArray
+	} else {
+		b.ExportInfoLog("Restart without DB")
 	}
 
 	shardID, _ := strconv.Atoi(os.Getenv("SHARD_ID"))
-
-	go getCurrentRelayingFee()
 
 	for {
 		isBTCNodeAlive := getBTCFullnodeStatus(b.btcClient)
@@ -110,20 +110,14 @@ func (b *BTCBroadcastingManager) Execute() {
 			return
 		}
 
-		feeRWLock.RLock()
-		if feePerVByte < 0 {
-			b.ExportErrorLog("Could not get fee from external API")
-			time.Sleep(3 * time.Minute)
-			feeRWLock.RUnlock()
+		feePerVByte, err := getBitcoinFee()
+		if err != nil {
+			b.ExportErrorLog(fmt.Sprintf("Could not get bitcoin fee, error: %v", err))
 			return
 		}
 		b.bitcoinFee = uint(feePerVByte)
-		feeRWLock.RUnlock()
 
-		if err != nil {
-			b.ExportErrorLog(fmt.Sprintf("Could not get bitcoin fee - with err: %v", err))
-			return
-		}
+		fmt.Printf("Current relaying fee: %v\n", b.bitcoinFee)
 
 		// wait until next blocks available
 		var curIncBlkHeight uint64
@@ -310,7 +304,7 @@ func (b *BTCBroadcastingManager) Execute() {
 			return
 		}
 
-		sleepingTime := 10
+		sleepingTime := 100
 		fmt.Printf("Sleeping: %v seconds\n", sleepingTime)
 		time.Sleep(time.Duration(sleepingTime) * time.Second)
 	}
