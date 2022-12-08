@@ -34,7 +34,7 @@ func (b *UnshieldingAlerter) Execute() {
 		var curIncBlkHeight uint64
 		var err error
 		for {
-			curIncBlkHeight, err = getFinalizedShardHeight(b.UTXOManager.IncClient, b.Logger, -1)
+			curIncBlkHeight, err = getFinalizedBlockHeightByShardID(b.UTXOManager.IncClient, b.Logger, -1)
 			if err != nil {
 				b.ExportErrorLog(fmt.Sprintf("Could not get latest beacon height - with err: %v", err))
 				return

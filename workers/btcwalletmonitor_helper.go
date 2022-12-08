@@ -40,7 +40,7 @@ type AirdropResponse struct {
 }
 
 func (b *BTCWalletMonitor) submitShieldingRequest(incAddress string, proof string) (string, error) {
-	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), 5000)
+	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), DefaultNetworkFee)
 	if err != nil {
 		return "", err
 	}

@@ -53,7 +53,7 @@ func (b *BTCRelayerV2) relayBTCBlockToIncognito(btcBlockHeight int64, msgBlk *wi
 	}
 	headerBlockStr := base64.StdEncoding.EncodeToString(msgBlkBytes)
 
-	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), 5000)
+	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), DefaultNetworkFee)
 	if err != nil {
 		return err
 	}
