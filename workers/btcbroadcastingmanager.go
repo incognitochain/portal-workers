@@ -122,7 +122,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		// wait until next blocks available
 		var curIncBlkHeight uint64
 		for {
-			curIncBlkHeight, err = getFinalizedShardHeight(b.UTXOManager.IncClient, b.Logger, -1)
+			curIncBlkHeight, err = getFinalizedBlockHeightByShardID(b.UTXOManager.IncClient, b.Logger, -1)
 			if err != nil {
 				b.ExportErrorLog(fmt.Sprintf("Could not get latest beacon height - with err: %v", err))
 				return
@@ -133,18 +133,19 @@ func (b *BTCBroadcastingManager) Execute() {
 			time.Sleep(40 * time.Second)
 		}
 
-		var IncBlockBatchSize uint64
-		if nextBlkHeight+InitIncBlockBatchSize-1 <= curIncBlkHeight {
-			IncBlockBatchSize = InitIncBlockBatchSize
-		} else {
-			IncBlockBatchSize = curIncBlkHeight - nextBlkHeight + 1
-		}
+		// var IncBlockBatchSize uint64
+		// if nextBlkHeight+InitIncBlockBatchSize-1 <= curIncBlkHeight {
+		// 	IncBlockBatchSize = InitIncBlockBatchSize
+		// } else {
+		// 	IncBlockBatchSize = curIncBlkHeight - nextBlkHeight + 1
+		// }
 
-		fmt.Printf("Next Scan Block Height: %v, Batch Size: %v, Current Finalized Block Height: %v\n", nextBlkHeight, IncBlockBatchSize, curIncBlkHeight)
+		// fmt.Printf("Next Scan Block Height: %v, Batch Size: %v, Current Finalized Block Height: %v\n", nextBlkHeight, IncBlockBatchSize, curIncBlkHeight)
 
-		batchIDs, err := getBatchIDsFromBeaconHeight(nextBlkHeight+IncBlockBatchSize-1, b.RPCClient, b.Logger, uint64(FirstBroadcastTxBlockHeight))
+		// Only need to get the batchID from the lastest beacon height
+		batchIDs, err := getBatchIDsFromBeaconHeight(curIncBlkHeight, b.RPCClient, b.Logger, uint64(FirstBroadcastTxBlockHeight))
 		if err != nil {
-			b.ExportErrorLog(fmt.Sprintf("Could not retrieve batches from beacon block %v - with err: %v", nextBlkHeight+IncBlockBatchSize-1, err))
+			b.ExportErrorLog(fmt.Sprintf("Could not retrieve batches from beacon block %v - with err: %v", curIncBlkHeight, err))
 			return
 		}
 		newBroadcastTxArray, err := b.getBroadcastTx(broadcastTxArray, batchIDs, curIncBlkHeight)
@@ -262,7 +263,16 @@ func (b *BTCBroadcastingManager) Execute() {
 					defer wg.Done()
 					newFee := utils.GetNewFee(curTx.VSize, curTx.FeePerRequest, curTx.NumOfRequests, b.bitcoinFee)
 					if newFee > MaxUnshieldFee {
-						return
+						if curTx.FeePerRequest < MaxUnshieldFee {
+							newFee = MaxUnshieldFee
+						} else {
+							// // re-broadcast tx
+							// err := b.broadcastTx(curTx.TxContent)
+							// if err != nil {
+							// 	b.ExportErrorLog(fmt.Sprintf("Could not broadcast tx %v - with err: %v", tx.TxHash, err))
+							// }
+							return
+						}
 					}
 					fmt.Printf("Old fee %v, request new fee %v for batchID %v\n", curTx.FeePerRequest, newFee, curBatchID)
 					// notify the Inc chain for fee replacement
@@ -291,7 +301,7 @@ func (b *BTCBroadcastingManager) Execute() {
 		}
 		wg.Wait()
 
-		nextBlkHeight += IncBlockBatchSize
+		nextBlkHeight = curIncBlkHeight + 1
 
 		// update to db
 		BroadcastTxArrayObjectBytes, _ := json.Marshal(&BroadcastTxArrayObject{

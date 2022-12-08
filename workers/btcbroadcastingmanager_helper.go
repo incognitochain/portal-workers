@@ -149,6 +149,9 @@ func (b *BTCBroadcastingManager) getRBFRawTx(
 	numOfRequests := initBroadcastTx.NumOfRequests
 	feePerRequest := reqTx.NetworkFee
 	acceptableFee := utils.IsEnoughFee(vsize, feePerRequest, numOfRequests, b.bitcoinFee)
+	if !acceptableFee && feePerRequest == MaxUnshieldFee {
+		acceptableFee = true
+	}
 
 	params := []interface{}{
 		map[string]string{
@@ -241,7 +244,7 @@ func (b *BTCBroadcastingManager) getBroadcastTx(
 }
 
 func (b *BTCBroadcastingManager) submitConfirmedTx(proof string, batchID string) (string, error) {
-	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), 5000)
+	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), DefaultNetworkFee)
 	if err != nil {
 		return "", err
 	}
@@ -294,7 +297,7 @@ func (b *BTCBroadcastingManager) getSubmitConfirmedTxStatus(txID string) (int, e
 }
 
 func (b *BTCBroadcastingManager) requestFeeReplacement(batchID string, newFee uint) (string, error) {
-	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), 5000)
+	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), DefaultNetworkFee)
 	if err != nil {
 		return "", err
 	}

@@ -12,7 +12,7 @@ import (
 const (
 	MaxLoopTime   = 100
 	MaxReceiver   = 10
-	MinUTXOAmount = 10000
+	MinUTXOAmount = 1e9  // 1 PRV
 	PRVIDStr      = "0000000000000000000000000000000000000000000000000000000000000004"
 )
 

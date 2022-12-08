@@ -106,7 +106,7 @@ func getLatestBTCHeightFromIncogWithoutFork(
 	return currentBTCBlkHeight, nil
 }
 
-func getFinalizedShardHeight(incClient *incclient.IncClient, logger *logrus.Entry, shardID int) (uint64, error) {
+func getFinalizedBlockHeightByShardID(incClient *incclient.IncClient, logger *logrus.Entry, shardID int) (uint64, error) {
 	params := []interface{}{
 		shardID,
 	}
@@ -142,7 +142,7 @@ func isFinalizedTx(incClient *incclient.IncClient, logger *logrus.Entry, shardID
 			continue
 		}
 
-		currentFinalizedHeight, err := getFinalizedShardHeight(incClient, logger, shardID)
+		currentFinalizedHeight, err := getFinalizedBlockHeightByShardID(incClient, logger, shardID)
 		if err != nil {
 			time.Sleep(IntervalTries)
 			continue
