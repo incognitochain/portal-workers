@@ -178,7 +178,14 @@ func (c *UTXOManager) GetListUnspentUTXO(privateKey string) ([]UTXO, error) {
 	if err != nil {
 		return []UTXO{}, err
 	}
-	c.Unspent[publicKey] = c.getListUTXOKeyImagesWithoutCached(utxos, publicKey)
+
+	bigUTXOs := []UTXO{}
+	for _, u := range utxos {
+		if u.Coin.GetValue() >= MinUTXOAmount*MaxReceiver {
+			bigUTXOs = append(bigUTXOs, u)
+		}
+	}
+	c.Unspent[publicKey] = c.getListUTXOKeyImagesWithoutCached(bigUTXOs, publicKey)
 
 	return c.Unspent[publicKey], nil
 }
