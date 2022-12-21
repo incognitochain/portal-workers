@@ -296,9 +296,9 @@ func (b *BTCWalletMonitor) Execute() {
 								b.ExportErrorLog(fmt.Sprintf("Request shielding failed BTC tx %v, shielding txID %v - invalid proof", curTxHash, txID))
 							}
 						} else {
-							airdropTxID, err := sendAirdropRequest(curValue.IncAddress)
+							res, err := sendAirdropRequest(curValue.IncAddress)
 							if err == nil {
-								b.ExportInfoLog(fmt.Sprintf("Request shielding succeed BTC tx %v, shielding txID %v, airdrop TxID: %v", curTxHash, txID, airdropTxID))
+								b.ExportInfoLog(fmt.Sprintf("Request shielding succeed BTC tx %v, shielding txID %v, airdrop status: %v", curTxHash, txID, res))
 							} else {
 								b.ExportInfoLog(fmt.Sprintf("Request shielding succeed BTC tx %v, shielding txID %v, airdrop failed - %v", curTxHash, txID, err))
 							}

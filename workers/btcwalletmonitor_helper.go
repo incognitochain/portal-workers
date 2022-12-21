@@ -35,8 +35,7 @@ type ErrorInfo struct {
 }
 
 type AirdropResponse struct {
-	Error  *ErrorInfo `json:"Error"`
-	Result string     `json:"Result"`
+	Result int `json:"Result"`
 }
 
 func (b *BTCWalletMonitor) submitShieldingRequest(incAddress string, proof string) (string, error) {
@@ -145,7 +144,7 @@ func convertBTCtoNanopBTC(amount float64) uint64 {
 	return uint64(amount*1e9 + 0.5)
 }
 
-func sendAirdropRequest(incAddress string) (string, error) {
+func sendAirdropRequest(incAddress string) (int, error) {
 	client := resty.New()
 
 	response, err := client.R().
@@ -153,18 +152,15 @@ func sendAirdropRequest(incAddress string) (string, error) {
 		Post(os.Getenv("AIRDROP_PRV_HOST"))
 
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 	if response.StatusCode() != 200 {
-		return "", fmt.Errorf("Response status code: %v", response.StatusCode())
+		return 0, fmt.Errorf("Response status code: %v", response.StatusCode())
 	}
 	var responseBody AirdropResponse
 	err = json.Unmarshal(response.Body(), &responseBody)
 	if err != nil {
-		return "", fmt.Errorf("Could not parse response: %v", response.Body())
-	}
-	if responseBody.Error != nil {
-		return "", fmt.Errorf("Error: %v", responseBody.Error)
+		return 0, fmt.Errorf("Could not parse response: %v", response.Body())
 	}
 	return responseBody.Result, nil
 }
