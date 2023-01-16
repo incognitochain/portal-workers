@@ -244,7 +244,7 @@ func (b *BTCBroadcastingManager) getBroadcastTx(
 }
 
 func (b *BTCBroadcastingManager) submitConfirmedTx(proof string, batchID string) (string, error) {
-	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), DefaultNetworkFee)
+	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), DefaultNetworkFee*5)
 	if err != nil {
 		return "", err
 	}
