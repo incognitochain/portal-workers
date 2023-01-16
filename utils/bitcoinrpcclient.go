@@ -3,7 +3,7 @@ package utils
 import (
 	"os"
 
-	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/0xkraken/btcd/rpcclient"
 )
 
 func BuildBTCClient() (*rpcclient.Client, error) {

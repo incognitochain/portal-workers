@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/0xkraken/btcd/rpcclient"
 	"github.com/incognitochain/portal-workers/utils"
 	"github.com/incognitochain/portal-workers/utxomanager"
 	"github.com/syndtr/goleveldb/leveldb"
