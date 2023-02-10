@@ -11,7 +11,7 @@ import (
 
 const (
 	MaxLoopTime   = 100
-	MaxReceiver   = 2
+	MaxReceiver   = 30
 	MinUTXOAmount = 1e9 // 1 PRV
 	PRVIDStr      = "0000000000000000000000000000000000000000000000000000000000000004"
 )
@@ -47,9 +47,13 @@ func SplitUTXOs(privateKey string, paymentAddress string, minNumUTXOs int, utxoM
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				receiverList := []string{paymentAddress}
-				amountList := []uint64{utxo.Coin.GetValue() / 2}
-
+				receiverList := []string{}
+				amountList := []uint64{}
+				amt := (utxo.Coin.GetValue() - incclient.DefaultPRVFee) / MaxReceiver
+				for i := 0; i < MaxReceiver; i++ {
+					receiverList = append(receiverList, paymentAddress)
+					amountList = append(amountList, amt)
+				}
 				txParam := incclient.NewTxParam(privateKey, receiverList, amountList, 0, nil, nil, nil)
 
 				encodedTx, txID, err := utxoManager.IncClient.CreateRawTransactionWithInputCoins(
