@@ -73,6 +73,7 @@ func getBTCBestStateFromIncog(rpcRelayingReaders []*utils.HttpClient) (*blockcha
 			bestNum = num
 		}
 	}
+	fmt.Printf("best num: %v - %v\n", bestNum, resBestState.Height)
 	if resBestState == nil {
 		return nil, errors.New("Can not get BTC height from all beacon and fullnode")
 	}
