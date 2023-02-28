@@ -95,6 +95,9 @@ func (b *BTCRelayerV2) Execute() {
 
 	blockQueue := make(chan btcBlockRes, BTCBlockBatchSize)
 	relayingResQueue := make(chan error, BTCBlockBatchSize)
+
+	numRoundDontInscreaseBlock := 0
+
 	for {
 		isBTCNodeAlive := getBTCFullnodeStatus(b.btcClient)
 		if !isBTCNodeAlive {
@@ -102,12 +105,15 @@ func (b *BTCRelayerV2) Execute() {
 			return
 		}
 
+		prevBlockHeight := latestBTCBlkHeight
+
 		// get latest BTC block from Incognito
 		latestBTCBlkHeight, err = getLatestBTCHeightFromIncogWithoutFork(b.btcClient, b.RPCBTCRelayingReaders, b.Logger)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not get latest btc block height from incognito chain - with err: %v", err))
 			return
 		}
+
 		nextBlkHeight := latestBTCBlkHeight + 1
 
 		// wait until next BTC blocks available
@@ -122,6 +128,13 @@ func (b *BTCRelayerV2) Execute() {
 				break
 			}
 			time.Sleep(40 * time.Second)
+		}
+		if prevBlockHeight == latestBTCBlkHeight && nextBlkHeight < uint64(btcBestHeight) {
+			numRoundDontInscreaseBlock++
+		}
+		if numRoundDontInscreaseBlock == 10 {
+			b.ExportErrorLog("BTC header block height does not inscrease")
+			return
 		}
 
 		var batchSize uint64
