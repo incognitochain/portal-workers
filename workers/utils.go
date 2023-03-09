@@ -32,3 +32,20 @@ func getBitcoinFee() (float64, error) {
 	}
 	return responseBody.Result, nil
 }
+
+func broadcastTxToBlockStream(txHex string) (string, error) {
+	client := resty.New()
+
+	url := "https://blockstream.info/api/tx"
+
+	response, err := client.R().SetBody(txHex).Post(url)
+	if err != nil {
+		return "", err
+	}
+	fmt.Printf("response: %+v\n", response)
+	if response.StatusCode() != 200 {
+		return "", fmt.Errorf("Request status code: %v - Error %v", response.StatusCode(), response)
+	}
+
+	return response.String(), nil
+}

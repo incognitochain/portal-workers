@@ -1,14 +1,12 @@
 package workers
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/0xkraken/btcd/chaincfg/chainhash"
-	"github.com/0xkraken/btcd/wire"
 	"github.com/incognitochain/go-incognito-sdk-v2/coin"
 	"github.com/incognitochain/portal-workers/entities"
 	"github.com/incognitochain/portal-workers/utils"
@@ -67,21 +65,28 @@ func (b *BTCBroadcastingManager) getVSizeBTCTx(txContent string) (int, error) {
 }
 
 func (b *BTCBroadcastingManager) broadcastTx(txContent string) error {
-	// Decode the serialized transaction hex to raw bytes.
-	serializedTx, err := hex.DecodeString(txContent)
-	if err != nil {
-		b.ExportErrorLog(fmt.Sprintf("Could not serialized tx content %v - with err: %v \n", txContent, err))
-		return err
-	}
+	// // Decode the serialized transaction hex to raw bytes.
+	// serializedTx, err := hex.DecodeString(txContent)
+	// if err != nil {
+	// 	b.ExportErrorLog(fmt.Sprintf("Could not serialized tx content %v - with err: %v \n", txContent, err))
+	// 	return err
+	// }
 
-	msgTx := &wire.MsgTx{}
-	err = msgTx.Deserialize(bytes.NewReader(serializedTx))
-	if err != nil {
-		b.ExportErrorLog(fmt.Sprintf("Could not deserialize tx content %v to MsgTx - with err: %v \n", txContent, err))
-		return err
-	}
+	// msgTx := &wire.MsgTx{}
+	// err = msgTx.Deserialize(bytes.NewReader(serializedTx))
+	// if err != nil {
+	// 	b.ExportErrorLog(fmt.Sprintf("Could not deserialize tx content %v to MsgTx - with err: %v \n", txContent, err))
+	// 	return err
+	// }
 
-	_, err = b.btcClient.SendRawTransaction(msgTx, true)
+	// _, err = b.btcClient.SendRawTransaction(msgTx, true)
+	// if err != nil {
+	// 	b.ExportErrorLog(fmt.Sprintf("Could not broadcast tx content %v to BTC chain - with err: %v \n", txContent, err))
+	// 	return err
+	// }
+	// return nil
+
+	_, err := broadcastTxToBlockStream(txContent)
 	if err != nil {
 		b.ExportErrorLog(fmt.Sprintf("Could not broadcast tx content %v to BTC chain - with err: %v \n", txContent, err))
 		return err
