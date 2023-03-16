@@ -42,7 +42,7 @@ func main() {
 		workerIDs = append(workerIDs, workerIDInt)
 	}
 
-	incClient, err := incclient.NewIncClient(
+	incClient, err := incclient.NewIncClientWithCache(
 		fmt.Sprintf("%v://%v:%v", os.Getenv("INCOGNITO_PROTOCOL"), os.Getenv("INCOGNITO_HOST"), os.Getenv("INCOGNITO_PORT")),
 		"",
 		2,
