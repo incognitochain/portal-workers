@@ -156,6 +156,9 @@ func (b *BTCBroadcastingManager) Execute() {
 
 		for batchID, batchInfo := range newBroadcastTxArray {
 			for _, tx := range batchInfo {
+				if tx == nil {
+					continue
+				}
 				if tx.IsBroadcasted {
 					fmt.Printf("Broadcast tx for batch %v, content %v \n", batchID, tx.TxContent)
 					err := b.broadcastTx(tx.TxContent)
@@ -186,6 +189,9 @@ func (b *BTCBroadcastingManager) Execute() {
 				curBatchID := batchID
 				curTx := tx
 
+				if curTx == nil {
+					continue
+				}
 				isConfirmed, btcBlockHeight := b.isConfirmedBTCTx(curTx.TxHash)
 
 				if isConfirmed && btcBlockHeight+BTCConfirmationThreshold-1 <= relayingBTCHeight {
