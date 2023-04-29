@@ -4,3 +4,4 @@ db
 .env_test
 .env_main
 /.idea
+.cache/.
