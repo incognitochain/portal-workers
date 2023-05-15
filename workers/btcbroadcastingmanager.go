@@ -110,12 +110,12 @@ func (b *BTCBroadcastingManager) Execute() {
 			return
 		}
 
-		feePerVByte, err := getBitcoinFee()
+		feePerVByte, err := b.getFeeRateFromMempool()
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not get bitcoin fee, error: %v", err))
 			return
 		}
-		b.bitcoinFee = uint(feePerVByte)
+		b.bitcoinFee = uint(feePerVByte.HalfHourFee)
 
 		fmt.Printf("Current relaying fee: %v\n", b.bitcoinFee)
 

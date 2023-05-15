@@ -2,7 +2,10 @@ package workers
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"time"
 
@@ -408,4 +411,38 @@ func joinTxArray(
 		}
 	}
 	return joinedArray
+}
+
+type FeeRates struct {
+	FastestFee  int `json:"fastestFee"`
+	HalfHourFee int `json:"halfHourFee"`
+	HourFee     int `json:"hourFee"`
+	EconomyFee  int `json:"economyFee"`
+	MinimumFee  int `json:"minimumFee"`
+}
+
+func (u BTCBroadcastingManager) getFeeRateFromMempool() (*FeeRates, error) {
+
+	response, err := http.Get("https://mempool.space/api/v1/fees/recommended")
+
+	if err != nil {
+		fmt.Print(err.Error())
+		return nil, err
+	}
+
+	responseData, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	//fmt.Println("responseData", string(responseData))
+
+	feeRateObj := &FeeRates{}
+
+	err = json.Unmarshal(responseData, &feeRateObj)
+	if err != nil {
+		return nil, err
+	}
+	return feeRateObj, nil
+
 }
