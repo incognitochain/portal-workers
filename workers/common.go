@@ -18,6 +18,7 @@ import (
 
 type btcBestStateRes struct {
 	btcBestState *blockchain.BestState
+	nodeIndex    int
 	err          error
 }
 
@@ -29,8 +30,9 @@ func getBTCFullnodeStatus(btcClient *rpcclient.Client) bool {
 func getBTCBestStateFromIncog(rpcRelayingReaders []*utils.HttpClient) (*blockchain.BestState, error) {
 	var wg sync.WaitGroup
 	btcBestStates := make(chan btcBestStateRes, len(rpcRelayingReaders))
-	for _, btcRelayingHeader := range rpcRelayingReaders {
+	for i, btcRelayingHeader := range rpcRelayingReaders {
 		rpcClient := btcRelayingHeader
+		i := i
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -38,46 +40,69 @@ func getBTCBestStateFromIncog(rpcRelayingReaders []*utils.HttpClient) (*blockcha
 			var btcRelayingBestStateRes entities.BTCRelayingBestStateRes
 			err := rpcClient.RPCCall("getbtcrelayingbeststate", params, &btcRelayingBestStateRes)
 			if err != nil {
-				btcBestStates <- btcBestStateRes{btcBestState: nil, err: err}
+				btcBestStates <- btcBestStateRes{btcBestState: nil, nodeIndex: i, err: err}
 				return
 			}
 			if btcRelayingBestStateRes.RPCError != nil {
-				btcBestStates <- btcBestStateRes{btcBestState: nil, err: errors.New(btcRelayingBestStateRes.RPCError.Message)}
+				btcBestStates <- btcBestStateRes{btcBestState: nil, nodeIndex: i, err: errors.New(btcRelayingBestStateRes.RPCError.Message)}
 				return
 			}
 			btcBestState := btcRelayingBestStateRes.Result
 			if btcBestState == nil {
-				btcBestStates <- btcBestStateRes{btcBestState: nil, err: errors.New("BTC relaying best state is nil")}
+				btcBestStates <- btcBestStateRes{btcBestState: nil, nodeIndex: i, err: errors.New("BTC relaying best state is nil")}
 				return
 			}
-			btcBestStates <- btcBestStateRes{btcBestState: btcBestState, err: nil}
+			btcBestStates <- btcBestStateRes{btcBestState: btcBestState, nodeIndex: i, err: nil}
 		}()
 	}
 	wg.Wait()
 
 	close(btcBestStates)
 
-	var resBestState blockchain.BestState
-
-	m := map[blockchain.BestState]int{}
+	nodeErrs := []int{}
+	m := map[blockchain.BestState][]int{}
 	for btcBestStateRes := range btcBestStates {
-		if btcBestStateRes.err == nil {
-			m[*btcBestStateRes.btcBestState] = m[*btcBestStateRes.btcBestState] + 1
+		if btcBestStateRes.err != nil {
+			nodeErrs = append(nodeErrs, btcBestStateRes.nodeIndex)
+		} else {
+			if m[*btcBestStateRes.btcBestState] == nil {
+				m[*btcBestStateRes.btcBestState] = []int{}
+			}
+			m[*btcBestStateRes.btcBestState] = append(m[*btcBestStateRes.btcBestState], btcBestStateRes.nodeIndex)
 		}
 	}
 
-	bestNum := -1
-	for btcBestState, num := range m {
-		if bestNum < num {
-			resBestState = btcBestState
-			bestNum = num
+	if len(nodeErrs) > 0 {
+		return nil, fmt.Errorf("Can not get BTC height from beacon node: %+v", nodeErrs)
+	}
+
+	if len(m) > 1 {
+		msg := fmt.Sprintf("Beacon nodes have diff btc header chains\n")
+		for btcState, nodeIndices := range m {
+			msg += "Node "
+			for _, nodeIndex := range nodeIndices {
+				msg += fmt.Sprintf("%v, ", nodeIndex)
+			}
+			msg += fmt.Sprintf(": BTC block height: %v\n", btcState.Height)
+		}
+		utils.SendSlackNotification(msg, utils.AlertNotification)
+	}
+
+	// return the smnallest block height state
+	var resBestState *blockchain.BestState
+	for btcState, _ := range m {
+		if resBestState == nil {
+			resBestState = &btcState
+		} else if btcState.Height < resBestState.Height {
+			resBestState = &btcState
 		}
 	}
+
 	if resBestState.Height == 0 {
 		return nil, errors.New("Can not get BTC height from all beacon and fullnode")
 	}
 
-	return &resBestState, nil
+	return resBestState, nil
 }
 
 func getLatestBTCHeightFromIncog(rpcRelayingReaders []*utils.HttpClient) (uint64, error) {
