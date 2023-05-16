@@ -3,9 +3,9 @@ package utils
 import (
 	"math"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcutil"
+	"github.com/0xkraken/btcd/chaincfg/chainhash"
+	"github.com/0xkraken/btcd/txscript"
+	"github.com/0xkraken/btcutil"
 )
 
 const (

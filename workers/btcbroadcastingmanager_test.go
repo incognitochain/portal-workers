@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/0xkraken/btcd/btcjson"
+	"github.com/0xkraken/btcd/rpcclient"
 	"github.com/incognitochain/go-incognito-sdk-v2/incclient"
 	"github.com/incognitochain/portal-workers/utils"
 	"github.com/incognitochain/portal-workers/utxomanager"

@@ -1,7 +1,7 @@
 package entities
 
 import (
-	"github.com/btcsuite/btcd/blockchain"
+	"github.com/0xkraken/btcd/blockchain"
 )
 
 type RelayingBlockRes struct {

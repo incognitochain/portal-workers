@@ -8,7 +8,7 @@ import (
 )
 
 func TestCallPortalVault(t *testing.T) {
-	beaconHeight := uint64(2551081)
+	beaconHeight := uint64(3434767)
 
 	rpcClient := utils.NewHttpClient("https://mainnet.incognito.org/fullnode", "", "", "")
 	btcID := "b832e5d3b1f01a4f0623f7fe91d6673461e1f5d37d91fe78c5c2e6183ff39696"
@@ -69,7 +69,7 @@ func TestGetUnshieldFee(t *testing.T) {
 	// btcID := "4584d5e9b2fc0337dfb17f4b5bb025e5b82c38cfa4f54e8a3d4fcdd03954ff82"
 
 	unshieldReqs := map[string]UnshieldInfo{}
-	for blk := fromBeaconHeight; blk <= toBeaconHeight; blk+=30 {
+	for blk := fromBeaconHeight; blk <= toBeaconHeight; blk += 30 {
 		portalState, err := GetPortalState(blk, rpcClient)
 		if err != nil {
 			fmt.Printf("Err get portal state: %v\n", err)

@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
+	"github.com/0xkraken/btcd/wire"
 	"github.com/incognitochain/go-incognito-sdk-v2/incclient"
 	"github.com/incognitochain/portal-workers/utxomanager"
 )

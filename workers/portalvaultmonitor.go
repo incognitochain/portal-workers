@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/0xkraken/btcd/rpcclient"
 	"github.com/incognitochain/portal-workers/utils"
 	"github.com/incognitochain/portal-workers/utxomanager"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -166,7 +166,7 @@ func (b *PortalVaultMonitor) Execute() {
 
 		if totalPBTCAmount > totalBTCAmount+AllowDiffAmount {
 			fmt.Printf("Beacon height %v: different vault: totalPBTCAmount %v - totalBTCAmount %v - diff amount: %v\n",
-				beaconHeight, totalPBTCAmount, totalBTCAmount, totalPBTCAmount - totalBTCAmount)
+				beaconHeight, totalPBTCAmount, totalBTCAmount, totalPBTCAmount-totalBTCAmount)
 			// fmt.Printf("utxoAmountInVault: %v\n", utxoAmountInVault)
 			// fmt.Printf("changeUtxoAmountInBatchTxs: %v\n", changeUtxoAmountInBatchTxs)
 			b.ExportErrorLog(fmt.Sprintf("Beacon height %v: Different vault: totalPBTCAmount %v - totalBTCAmount %v",

@@ -8,21 +8,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/rpcclient"
-	"github.com/btcsuite/btcutil"
+	"github.com/0xkraken/btcd/chaincfg"
+	"github.com/0xkraken/btcd/chaincfg/chainhash"
+	"github.com/0xkraken/btcd/rpcclient"
+	"github.com/0xkraken/btcutil"
 	"github.com/incognitochain/portal-workers/utils"
 	"github.com/incognitochain/portal-workers/utxomanager"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
 const (
-	FirstScannedBTCBlkHeight        = 1
+	FirstScannedBTCBlkHeight        = 697200
 	TimeoutTrackingInstanceInSecond = int64(365 * 24 * 60 * 60)
 	WalletMonitorDBFileDir          = "db/walletmonitor"
 	WalletMonitorDBObjectName       = "BTCMonitor-LastUpdate"
-	MinShieldAmount                 = 1000 // nano pBTC
+	MinShieldAmount                 = 100000 // nano pBTC
 )
 
 type BTCWalletMonitor struct {
@@ -181,7 +181,7 @@ func (b *BTCWalletMonitor) Execute() {
 		}
 		minConfirmation := BTCConfirmationThreshold
 		// Over confirmation just for sure
-		maxConfirmation := int(btcBestBlockHeight - lastScannedBTCBlockHeight + 30)
+		maxConfirmation := int(btcBestBlockHeight - lastScannedBTCBlockHeight + 144)
 		if maxConfirmation < minConfirmation {
 			maxConfirmation = minConfirmation
 		}
@@ -266,9 +266,18 @@ func (b *BTCWalletMonitor) Execute() {
 				go func() {
 					defer wg.Done()
 					// send RPC
+					if curTxHash == "5f07c905a3d449e8cb50976a5968571df99be16711e68e69ad056d4f3800057d" ||
+						curTxHash == "c7ad72656b636e1c6ae00f1855724cf3d0a14b01a209a6e7a5843a7869816b03" ||
+						curTxHash == "a936943e6fccf2843eec4e4421d4549f64a323f68dcfa1df56f75985b54588fb" ||
+						curTxHash == "c98620b0583877173de3abc9123c537014d89fd822fa59ec9b45b1d0acb95d33" ||
+						curTxHash == "d9babf6154deb0aff98dd766582bb8ab423681c4c681649c65a5cdc303621f29" {
+						b.ExportErrorLog(fmt.Sprintf("Ignore shielding BTC TxID: %v", curTxHash))
+						sentShieldingRequest <- curProofHash
+						return
+					}
 					txID, err := b.submitShieldingRequest(curValue.IncAddress, curValue.Proof)
 					if err != nil {
-						b.ExportErrorLog(fmt.Sprintf("Could not send shielding request from BTC tx %v proof with err: %v", curTxHash, err))
+						b.ExportErrorLog(fmt.Sprintf("Could not send shielding request from BTC tx %v proof for incAddress %v with err: %v", curTxHash, curValue.IncAddress, err))
 						return
 					}
 					fmt.Printf("Shielding txID: %v\n", txID)
@@ -288,7 +297,13 @@ func (b *BTCWalletMonitor) Execute() {
 								b.ExportErrorLog(fmt.Sprintf("Request shielding failed BTC tx %v, shielding txID %v - invalid proof", curTxHash, txID))
 							}
 						} else {
-							b.ExportInfoLog(fmt.Sprintf("Request shielding succeed BTC tx %v, shielding txID %v", curTxHash, txID))
+							res, err := sendAirdropRequest(curValue.IncAddress)
+							if err == nil {
+								b.ExportInfoLog(fmt.Sprintf("Request shielding succeed BTC tx %v, shielding txID %v, airdrop status: %v", curTxHash, txID, res))
+							} else {
+								b.ExportInfoLog(fmt.Sprintf("Request shielding succeed BTC tx %v, shielding txID %v, airdrop failed - %v", curTxHash, txID, err))
+							}
+
 							sentShieldingRequest <- curProofHash
 						}
 
@@ -314,6 +329,6 @@ func (b *BTCWalletMonitor) Execute() {
 			b.ExportErrorLog(fmt.Sprintf("Could not save object to db - with err: %v", err))
 			return
 		}
-		time.Sleep(15 * time.Second)
+		time.Sleep(100 * time.Second)
 	}
 }

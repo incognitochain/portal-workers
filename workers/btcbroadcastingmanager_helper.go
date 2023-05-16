@@ -1,14 +1,15 @@
 package workers
 
 import (
-	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/0xkraken/btcd/chaincfg/chainhash"
 	"github.com/incognitochain/go-incognito-sdk-v2/coin"
 	"github.com/incognitochain/portal-workers/entities"
 	"github.com/incognitochain/portal-workers/utils"
@@ -67,21 +68,28 @@ func (b *BTCBroadcastingManager) getVSizeBTCTx(txContent string) (int, error) {
 }
 
 func (b *BTCBroadcastingManager) broadcastTx(txContent string) error {
-	// Decode the serialized transaction hex to raw bytes.
-	serializedTx, err := hex.DecodeString(txContent)
-	if err != nil {
-		b.ExportErrorLog(fmt.Sprintf("Could not serialized tx content %v - with err: %v \n", txContent, err))
-		return err
-	}
+	// // Decode the serialized transaction hex to raw bytes.
+	// serializedTx, err := hex.DecodeString(txContent)
+	// if err != nil {
+	// 	b.ExportErrorLog(fmt.Sprintf("Could not serialized tx content %v - with err: %v \n", txContent, err))
+	// 	return err
+	// }
 
-	msgTx := &wire.MsgTx{}
-	err = msgTx.Deserialize(bytes.NewReader(serializedTx))
-	if err != nil {
-		b.ExportErrorLog(fmt.Sprintf("Could not deserialize tx content %v to MsgTx - with err: %v \n", txContent, err))
-		return err
-	}
+	// msgTx := &wire.MsgTx{}
+	// err = msgTx.Deserialize(bytes.NewReader(serializedTx))
+	// if err != nil {
+	// 	b.ExportErrorLog(fmt.Sprintf("Could not deserialize tx content %v to MsgTx - with err: %v \n", txContent, err))
+	// 	return err
+	// }
 
-	_, err = b.btcClient.SendRawTransaction(msgTx, true)
+	// _, err = b.btcClient.SendRawTransaction(msgTx, true)
+	// if err != nil {
+	// 	b.ExportErrorLog(fmt.Sprintf("Could not broadcast tx content %v to BTC chain - with err: %v \n", txContent, err))
+	// 	return err
+	// }
+	// return nil
+
+	_, err := broadcastTxToBlockStream(txContent)
 	if err != nil {
 		b.ExportErrorLog(fmt.Sprintf("Could not broadcast tx content %v to BTC chain - with err: %v \n", txContent, err))
 		return err
@@ -149,6 +157,9 @@ func (b *BTCBroadcastingManager) getRBFRawTx(
 	numOfRequests := initBroadcastTx.NumOfRequests
 	feePerRequest := reqTx.NetworkFee
 	acceptableFee := utils.IsEnoughFee(vsize, feePerRequest, numOfRequests, b.bitcoinFee)
+	if !acceptableFee && feePerRequest == MaxUnshieldFee {
+		acceptableFee = true
+	}
 
 	params := []interface{}{
 		map[string]string{
@@ -241,7 +252,7 @@ func (b *BTCBroadcastingManager) getBroadcastTx(
 }
 
 func (b *BTCBroadcastingManager) submitConfirmedTx(proof string, batchID string) (string, error) {
-	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), 5000)
+	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), DefaultNetworkFee*5)
 	if err != nil {
 		return "", err
 	}
@@ -294,7 +305,7 @@ func (b *BTCBroadcastingManager) getSubmitConfirmedTxStatus(txID string) (int, e
 }
 
 func (b *BTCBroadcastingManager) requestFeeReplacement(batchID string, newFee uint) (string, error) {
-	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), 5000)
+	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), DefaultNetworkFee)
 	if err != nil {
 		return "", err
 	}
@@ -400,4 +411,38 @@ func joinTxArray(
 		}
 	}
 	return joinedArray
+}
+
+type FeeRates struct {
+	FastestFee  int `json:"fastestFee"`
+	HalfHourFee int `json:"halfHourFee"`
+	HourFee     int `json:"hourFee"`
+	EconomyFee  int `json:"economyFee"`
+	MinimumFee  int `json:"minimumFee"`
+}
+
+func (u BTCBroadcastingManager) getFeeRateFromMempool() (*FeeRates, error) {
+
+	response, err := http.Get("https://mempool.space/api/v1/fees/recommended")
+
+	if err != nil {
+		fmt.Print(err.Error())
+		return nil, err
+	}
+
+	responseData, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	//fmt.Println("responseData", string(responseData))
+
+	feeRateObj := &FeeRates{}
+
+	err = json.Unmarshal(responseData, &feeRateObj)
+	if err != nil {
+		return nil, err
+	}
+	return feeRateObj, nil
+
 }

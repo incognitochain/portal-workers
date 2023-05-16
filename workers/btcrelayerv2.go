@@ -12,8 +12,8 @@ import (
 	"github.com/incognitochain/portal-workers/utils"
 	"github.com/incognitochain/portal-workers/utxomanager"
 
-	"github.com/btcsuite/btcd/rpcclient"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/0xkraken/btcd/rpcclient"
+	"github.com/0xkraken/btcd/wire"
 )
 
 const (
@@ -53,7 +53,7 @@ func (b *BTCRelayerV2) relayBTCBlockToIncognito(btcBlockHeight int64, msgBlk *wi
 	}
 	headerBlockStr := base64.StdEncoding.EncodeToString(msgBlkBytes)
 
-	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), 5000)
+	utxos, tmpTxID, err := b.UTXOManager.GetUTXOsByAmount(os.Getenv("INCOGNITO_PRIVATE_KEY"), DefaultNetworkFee*5)
 	if err != nil {
 		return err
 	}
@@ -95,6 +95,9 @@ func (b *BTCRelayerV2) Execute() {
 
 	blockQueue := make(chan btcBlockRes, BTCBlockBatchSize)
 	relayingResQueue := make(chan error, BTCBlockBatchSize)
+
+	numRoundDontInscreaseBlock := 0
+
 	for {
 		isBTCNodeAlive := getBTCFullnodeStatus(b.btcClient)
 		if !isBTCNodeAlive {
@@ -102,12 +105,15 @@ func (b *BTCRelayerV2) Execute() {
 			return
 		}
 
+		prevBlockHeight := latestBTCBlkHeight
+
 		// get latest BTC block from Incognito
 		latestBTCBlkHeight, err = getLatestBTCHeightFromIncogWithoutFork(b.btcClient, b.RPCBTCRelayingReaders, b.Logger)
 		if err != nil {
 			b.ExportErrorLog(fmt.Sprintf("Could not get latest btc block height from incognito chain - with err: %v", err))
 			return
 		}
+
 		nextBlkHeight := latestBTCBlkHeight + 1
 
 		// wait until next BTC blocks available
@@ -122,6 +128,14 @@ func (b *BTCRelayerV2) Execute() {
 				break
 			}
 			time.Sleep(40 * time.Second)
+		}
+		if prevBlockHeight == latestBTCBlkHeight && nextBlkHeight < uint64(btcBestHeight) {
+			numRoundDontInscreaseBlock++
+		}
+		if numRoundDontInscreaseBlock == 3 {
+			b.ExportErrorLog("BTC header block height does not inscrease")
+			b.Quit <- true
+			return
 		}
 
 		var batchSize uint64
@@ -189,6 +203,6 @@ func (b *BTCRelayerV2) Execute() {
 			}
 		}
 
-		time.Sleep(30 * time.Second)
+		time.Sleep(100 * time.Second)
 	}
 }

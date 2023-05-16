@@ -1,11 +1,12 @@
 package workers
 
-import "time"
+import (
+	"time"
+
+	"github.com/incognitochain/go-incognito-sdk-v2/incclient"
+)
 
 const (
-	// DefaultFee - default fee
-	DefaultFee = 20
-
 	BTCID                    = "b832e5d3b1f01a4f0623f7fe91d6673461e1f5d37d91fe78c5c2e6183ff39696"
 	BTCConfirmationThreshold = 6
 
@@ -21,3 +22,5 @@ const (
 	PortalUnshieldReqCompletedStatus = 2
 	PortalUnshieldReqRefundedStatus  = 3
 )
+
+var DefaultNetworkFee = incclient.DefaultPRVFee

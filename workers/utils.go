@@ -3,60 +3,61 @@ package workers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
-	"sync"
-	"time"
+
+	"fmt"
+	"os"
 
 	"github.com/incognitochain/go-incognito-sdk-v2/common"
 	"github.com/incognitochain/portal-workers/entities"
 	"github.com/incognitochain/portal-workers/utils"
+
+	resty "github.com/go-resty/resty/v2"
 )
 
-var feePerVByte float64 // satoshi / byte
-var feeRWLock sync.RWMutex
-
-type BlockCypherFeeResponse struct {
-	HighFee   uint `json:"high_fee_per_kb"`
-	MediumFee uint `json:"medium_fee_per_kb"`
-	LowFee    uint `json:"low_fee_per_kb"`
+type BlockchainFeeResponse struct {
+	Result float64
+	Error  error
 }
 
-func getCurrentRelayingFee() {
-	for {
-		func() {
-			response, err := http.Get("https://api.blockcypher.com/v1/btc/main")
-			feeRWLock.Lock()
-			defer func() {
-				feeRWLock.Unlock()
-				time.Sleep(3 * time.Minute)
-			}()
-			if err != nil {
-				feePerVByte = -1
-				return
-			}
-			if response.StatusCode != 200 {
-				feePerVByte = -1
-				return
-			}
-			responseData, err := ioutil.ReadAll(response.Body)
-			if err != nil {
-				feePerVByte = -1
-				return
-			}
-			var responseBody BlockCypherFeeResponse
-			err = json.Unmarshal(responseData, &responseBody)
-			if err != nil {
-				feePerVByte = -1
-				return
-			}
-			feePerVByte = float64(responseBody.MediumFee) / 1024
-		}()
+func getBitcoinFee() (float64, error) {
+	client := resty.New()
+
+	response, err := client.R().
+		Get(os.Getenv("BLOCKCHAIN_FEE_HOST"))
+
+	if err != nil {
+		return 0, err
 	}
+	if response.StatusCode() != 200 {
+		return 0, fmt.Errorf("Response status code: %v", response.StatusCode())
+	}
+	var responseBody BlockchainFeeResponse
+	err = json.Unmarshal(response.Body(), &responseBody)
+	if err != nil {
+		return 0, fmt.Errorf("Could not parse response: %v", response.Body())
+	}
+	return responseBody.Result, nil
+}
+
+func broadcastTxToBlockStream(txHex string) (string, error) {
+	client := resty.New()
+
+	url := "https://blockstream.info/api/tx"
+
+	response, err := client.R().SetBody(txHex).Post(url)
+	if err != nil {
+		return "", err
+	}
+	fmt.Printf("response: %+v\n", response)
+	if response.StatusCode() != 200 {
+		return "", fmt.Errorf("Request status code: %v - Error %v", response.StatusCode(), response)
+	}
+
+	return response.String(), nil
 }
 
 func GetListShieldingAddress(from int64, to int64) ([]*ShieldingMonitoringInfo, error) {

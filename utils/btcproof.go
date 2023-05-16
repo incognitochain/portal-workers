@@ -4,9 +4,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/rpcclient"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/0xkraken/btcd/chaincfg/chainhash"
+	"github.com/0xkraken/btcd/rpcclient"
+	"github.com/0xkraken/btcd/wire"
 )
 
 const BTCBlockConfirmations = 6
