@@ -89,12 +89,12 @@ func getBTCBestStateFromIncog(rpcRelayingReaders []*utils.HttpClient) (*blockcha
 	}
 
 	// return the smnallest block height state
-	var resBestState *blockchain.BestState
-	for btcState, _ := range m {
-		if resBestState == nil {
-			resBestState = &btcState
+	var resBestState blockchain.BestState
+	for btcState := range m {
+		if resBestState.Height == 0 {
+			resBestState = btcState
 		} else if btcState.Height < resBestState.Height {
-			resBestState = &btcState
+			resBestState = btcState
 		}
 	}
 
@@ -102,7 +102,7 @@ func getBTCBestStateFromIncog(rpcRelayingReaders []*utils.HttpClient) (*blockcha
 		return nil, errors.New("Can not get BTC height from all beacon and fullnode")
 	}
 
-	return resBestState, nil
+	return &resBestState, nil
 }
 
 func getLatestBTCHeightFromIncog(rpcRelayingReaders []*utils.HttpClient) (uint64, error) {
