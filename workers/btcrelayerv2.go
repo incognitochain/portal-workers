@@ -132,7 +132,7 @@ func (b *BTCRelayerV2) Execute() {
 		if prevBlockHeight == latestBTCBlkHeight && nextBlkHeight < uint64(btcBestHeight) {
 			numRoundDontInscreaseBlock++
 		}
-		if numRoundDontInscreaseBlock == 3 {
+		if numRoundDontInscreaseBlock == 20 {
 			b.ExportErrorLog("BTC header block height does not inscrease")
 			b.Quit <- true
 			return
