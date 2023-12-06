@@ -158,6 +158,10 @@ func (b *BTCWalletMonitor) Execute() {
 				continue
 			}
 
+			// if instance.BTCAddress != "bc1ql8v5d3nqvkytlkuu0v0r9tajpmts8mnfk73u3kclzsxu3akrzegszldsmz" {
+			// 	continue
+			// }
+
 			address, err := btcutil.DecodeAddress(instance.BTCAddress, b.chainCfg)
 			if err != nil {
 				b.ExportErrorLog(fmt.Sprintf("Could not decode address %v - with err: %v", instance.BTCAddress, err))
@@ -273,11 +277,15 @@ func (b *BTCWalletMonitor) Execute() {
 						curTxHash == "d9babf6154deb0aff98dd766582bb8ab423681c4c681649c65a5cdc303621f29" ||
 						curTxHash == "9f0ae7a7a9359328914993ac393caa58e93fb4c4eb2ba96ac0dcdc095880dbba" ||
 						curTxHash == "ed73f37116d2f0e5abe7c8e67c18570aae7c73bf04a374a7ca684b306b9ec29a" ||
-						curTxHash != "be7107cbae2b0b8379dce0c7aec189ad728125384a0701b017e2e845701ff1f3" {
+						curTxHash == "be7107cbae2b0b8379dce0c7aec189ad728125384a0701b017e2e845701ff1f3" {
 						b.ExportErrorLog(fmt.Sprintf("Ignore shielding BTC TxID: %v", curTxHash))
 						sentShieldingRequest <- curProofHash
 						return
 					}
+
+					// if curTxHash != "be7107cbae2b0b8379dce0c7aec189ad728125384a0701b017e2e845701ff1f3" {
+					// 	return
+					// }
 					txID, err := b.submitShieldingRequest(curValue.IncAddress, curValue.Proof)
 					if err != nil {
 						b.ExportErrorLog(fmt.Sprintf("Could not send shielding request from BTC tx %v proof for incAddress %v with err: %v", curTxHash, curValue.IncAddress, err))
