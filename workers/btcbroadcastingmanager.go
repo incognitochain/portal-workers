@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	MaxUnshieldFee                  = 5000000
+	MaxUnshieldFee                  = 1000000
 	InitIncBlockBatchSize           = 100
 	FirstBroadcastTxBlockHeight     = 1427305
 	TimeoutBTCFeeReplacement        = 80
